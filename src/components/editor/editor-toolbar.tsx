@@ -1,10 +1,12 @@
 import { Editor } from "@tiptap/react"
-import { Bold, Italic, Heading1, Heading2, Heading3, List, ListOrdered, Quote, Code, Minus, CheckSquare, Video } from "lucide-react"
+import { Bold, Italic, Heading1, Heading2, Heading3, List, ListOrdered, Quote, Code, Minus, CheckSquare, Video, Sparkles, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VoiceRecorder } from "./voice-recorder"
 
 interface EditorToolbarProps {
   editor: Editor | null
+  onMagicFormat?: () => void
+  isFormatting?: boolean
 }
 
 const ToolbarButton = ({ 
@@ -27,7 +29,7 @@ const ToolbarButton = ({
   </Button>
 )
 
-export function EditorToolbar({ editor }: EditorToolbarProps) {
+export function EditorToolbar({ editor, onMagicFormat, isFormatting }: EditorToolbarProps) {
   if (!editor) return null
 
   return (
@@ -83,6 +85,28 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
       </Button>
 
       <VoiceRecorder editor={editor} />
+
+      {/* Magic Format button — always visible, critical for mobile users */}
+      {onMagicFormat && (
+        <Button
+          variant="ghost"
+          size="sm"
+          type="button"
+          onClick={onMagicFormat}
+          disabled={isFormatting}
+          title="Magic Format — AI will restructure your note"
+          className="h-8 gap-1.5 ml-1 text-violet-600 bg-violet-500/10 hover:bg-violet-500/20 dark:text-violet-400 dark:bg-violet-500/20 dark:hover:bg-violet-500/30 transition-all"
+        >
+          {isFormatting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Sparkles className="h-3.5 w-3.5" />
+          )}
+          <span className="text-xs font-semibold">
+            {isFormatting ? "Formatting..." : "Magic"}
+          </span>
+        </Button>
+      )}
 
       <div className="w-[1px] h-6 bg-border/60 mx-1" />
 

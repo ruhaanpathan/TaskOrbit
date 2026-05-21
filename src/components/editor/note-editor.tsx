@@ -300,7 +300,10 @@ export function NoteEditor({ note, userId }: NoteEditorProps) {
           return (
             <div className="flex flex-wrap gap-2 mb-4 animate-in fade-in slide-in-from-top-2">
               {hasMeeting && (
-                <Button size="sm" variant="secondary" className="gap-2 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 dark:bg-blue-500/20 dark:text-blue-400 dark:hover:bg-blue-500/30" onClick={() => window.open('https://meet.google.com/new', '_blank')}>
+                <Button size="sm" variant="secondary" className="gap-2 bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 dark:bg-blue-500/20 dark:text-blue-400 dark:hover:bg-blue-500/30" onClick={() => {
+                  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+                  window.open(isMobile ? 'https://meet.google.com' : 'https://meet.google.com/new', '_blank')
+                }}>
                   <Video className="w-4 h-4" /> Start Meeting
                 </Button>
               )}
@@ -325,7 +328,7 @@ export function NoteEditor({ note, userId }: NoteEditorProps) {
               <p className="font-medium text-primary animate-pulse text-sm tracking-tight">AI is formatting your notes...</p>
             </div>
           )}
-          <EditorToolbar editor={editor} />
+          <EditorToolbar editor={editor} onMagicFormat={handleMagicFormat} isFormatting={isFormatting} />
           <div 
             className="flex-1 overflow-y-auto cursor-text bg-background focus:outline-none" 
             onClick={() => editor?.commands.focus()}
