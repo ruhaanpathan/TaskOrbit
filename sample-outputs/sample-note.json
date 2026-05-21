@@ -1,0 +1,22 @@
+{
+  "id": "cm08v2xyz000008l4b3d7a8z9",
+  "title": "Product Launch Meeting Notes",
+  "content": "<p>We discussed the upcoming Q3 product launch. <strong>Key takeaways:</strong></p><ul><li>Marketing campaign begins August 1st</li><li>Engineering must freeze code by July 20th</li><li>Sarah will coordinate with external PR agencies</li></ul>",
+  "isArchived": false,
+  "isPublic": true,
+  "shareId": "cly7q4wxc0002...",
+  "userId": "cm08v1abc000008l4...",
+  "createdAt": "2024-05-19T10:00:00.000Z",
+  "updatedAt": "2024-05-19T10:30:00.000Z",
+  "noteTags": [
+    {
+      "noteId": "cm08v2xyz000008l4b3d7a8z9",
+      "tagId": "cm08v1def000108l4...",
+      "tag": {
+        "id": "cm08v1def000108l4...",
+        "name": "Meeting",
+        "userId": "cm08v1abc000008l4..."
+      }
+    }
+  ]
+}

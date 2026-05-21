@@ -1,36 +1,112 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TaskOrbit - Collaborative AI Notes Workspace
 
-## Getting Started
+TaskOrbit is a modern, high-performance, full-stack note-taking workspace. It empowers users with a gorgeous rich-text editor, lightning-fast full-text search, and a suite of AI-driven productivity insights built directly into the workflow.
 
-First, run the development server:
+## Architecture & Technology Stack
 
+- **Next.js 14/15 App Router**: Selected for its seamless server-side rendering, advanced routing capabilities, and robust Server Actions which allow us to perform direct, secure database mutations without writing a separate API layer.
+- **PostgreSQL & Prisma**: The database layer uses a Neon PostgreSQL serverless database managed by the Prisma ORM. Prisma provides absolute type safety from the database schema straight to the React components.
+- **Tiptap**: The core editor engine. Tiptap is a headless, deeply customizable rich-text editor based on ProseMirror, allowing us to build a completely custom UI (using Tailwind) without fighting default WYSIWYG styles.
+- **Google Gemini API**: Integrated via `@google/genai` to automatically read user notes and instantly generate summaries, action items, and suggested titles formatted perfectly as JSON.
+- **Auth.js (NextAuth v5)**: Secures the entire application with a credentials provider and bcrypt password hashing, utilizing `middleware.ts` to guard protected routes on the Edge.
+
+## Keyboard Shortcuts
+
+Designed for power users, TaskOrbit features seamless keyboard navigation:
+- `Cmd/Ctrl + K` — Open the global search palette from anywhere
+- `Cmd/Ctrl + S` — Manually trigger a note save
+- `Cmd/Ctrl + Shift + I` — Instantly run the AI Insights generator on the current note
+
+## Local Setup Instructions
+
+Follow these steps to run the project locally on a clean machine:
+
+**1. Clone the repository and install dependencies**
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/yourusername/taskorbit.git
+cd taskorbit
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**2. Setup Environment Variables**
+Copy the example environment file:
+```bash
+cp .env.example .env.local
+```
+Then, open `.env.local` and fill in your values.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**3. Configure Neon PostgreSQL**
+- Go to [Neon.tech](https://neon.tech/) and create a free account.
+- Create a new project and copy your PostgreSQL connection string.
+- Paste it as your `DATABASE_URL` in `.env.local`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**4. Configure Google Gemini API**
+- Go to [Google AI Studio](https://aistudio.google.com/app/apikey).
+- Create an API key.
+- Paste it as your `GEMINI_API_KEY` in `.env.local`.
 
-## Learn More
+**5. Initialize the Database**
+Run Prisma migrations to build your tables:
+```bash
+npx prisma migrate dev --name init
+```
 
-To learn more about Next.js, take a look at the following resources:
+**6. Start the Development Server**
+```bash
+npm run dev
+```
+Visit `http://localhost:3000` to see the app!
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## API Endpoints
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+While most mutations use Next.js Server Actions, the application utilizes the following REST APIs:
 
-## Deploy on Vercel
+| Method | Path | Auth Required | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/auth/[...nextauth]` | No | Handles NextAuth login, registration, and session management. |
+| `POST` | `/api/notes/[id]/generate-insights`| Yes | Sends note content to Gemini, returns parsed JSON insights, and logs to `AiLog`. Rate limited to 5 calls/hour. |
+| `GET` | `/api/notes/search` | Yes | Executes native PostgreSQL `to_tsvector` full-text search and tag filtering. |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Database Schema Diagram
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
++----------------+       +-----------------+       +---------------+
+|      User      |       |      Note       |       |      Tag      |
+|----------------|       |-----------------|       |---------------|
+| id (PK)        |1    M | id (PK)         |     1 | id (PK)       |
+| name           |-------| title           |       | name          |
+| email          |       | content         |       | userId (FK)   |
+| passwordHash   |       | isArchived      |       +---------------+
+| createdAt      |       | isPublic        |              | 1
++----------------+       | shareId         |              |
+           |             | userId (FK)     |              |
+           |             | createdAt       |              |
+           |             | updatedAt       |              |
+           |             +-----------------+              |
+           |               | 1        | 1                 |
+         M |               |          |                   |
+  +---------------+        |          |                   |
+  |     Tag       |--------+          | M                 | M
+  +---------------+                 +-----------------+   |
+                                    |    NoteTag      |---+
+                                    |-----------------|
+                                    | noteId (FK)     |
+                                    | tagId (FK)      |
+                                    +-----------------+
+
+                                    +-----------------+
+                                    |     AiLog       |
+                                    |-----------------|
+                                    | id (PK)         |
+                                    | noteId (FK)     |
+                                    | summary         |
+                                    | actionItems     |
+                                    | suggestedTitle  |
+                                    +-----------------+
+```
+
+## Known Limitations & Future Improvements
+
+- **In-Memory Rate Limiting**: The current rate limiter for the AI endpoint uses a simple JavaScript `Map`. In a production environment with multiple serverless edge functions, this should be replaced with Upstash Redis to ensure limits are tracked globally.
+- **Authentication**: Currently uses standard Credentials. OAuth providers (Google, GitHub) could be added easily via Auth.js.
+- **Collaborative Editing**: Tiptap supports Yjs for real-time multiplayer editing, which would be an excellent upgrade for public notes.
