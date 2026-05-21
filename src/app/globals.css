@@ -129,6 +129,17 @@
     @apply font-sans;
   }
 
+  /* Completely hide all scrollbars globally for a clean look */
+  ::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+  * {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
   /* Tiptap Task List Styles */
   ul[data-type="taskList"] {
     list-style: none;
