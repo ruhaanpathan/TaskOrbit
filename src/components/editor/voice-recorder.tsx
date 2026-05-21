@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback, useEffect } from "react"
-import { Mic, MicOff, Loader2, Wand2 } from "lucide-react"
+import { Mic, MicOff, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { Editor } from "@tiptap/react"
@@ -21,6 +21,7 @@ export function VoiceRecorder({ editor }: VoiceRecorderProps) {
   const audioChunksRef = useRef<Blob[]>([])
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const editorRef = useRef<Editor | null>(null)
+  const secondsRef = useRef(0) // Tracks seconds in ref for use inside timer callback
 
   // Always keep the editor ref fresh so callbacks never use stale closures
   useEffect(() => {
@@ -63,6 +64,7 @@ export function VoiceRecorder({ editor }: VoiceRecorderProps) {
       const mediaRecorder = new MediaRecorder(stream, { mimeType })
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
+      secondsRef.current = 0
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
@@ -93,15 +95,19 @@ export function VoiceRecorder({ editor }: VoiceRecorderProps) {
 
       // Start recording timer
       timerRef.current = setInterval(() => {
-        setRecordingSeconds((prev) => {
-          // Auto-stop at 5 minutes to prevent huge files
-          if (prev >= 299) {
-            stopRecording()
-            toast.warning("Recording auto-stopped at 5 minutes.")
-            return prev
+        secondsRef.current += 1
+        setRecordingSeconds(secondsRef.current)
+
+        // Auto-stop at 5 minutes to prevent huge files
+        if (secondsRef.current >= 300) {
+          clearInterval(timerRef.current!)
+          timerRef.current = null
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+            mediaRecorderRef.current.stop()
+            setState("processing")
           }
-          return prev + 1
-        })
+          toast.warning("Recording auto-stopped at 5 minutes.")
+        }
       }, 1000)
 
       toast.success("🎙️ Recording started — speak now")

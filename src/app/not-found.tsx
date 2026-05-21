@@ -1,12 +1,6 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { FileQuestion } from "lucide-react"
-import type { Metadata } from "next"
-
-export const metadata: Metadata = {
-  title: "Page Not Found — TaskOrbit",
-  description: "The page you are looking for does not exist.",
-}
 
 export default function NotFound() {
   return (
