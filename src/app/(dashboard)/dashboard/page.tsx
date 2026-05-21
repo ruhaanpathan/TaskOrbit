@@ -100,11 +100,10 @@ export default async function DashboardPage() {
   
   allActiveNotes.forEach(note => {
     // Temporary store for manual tasks to check for duplicates
-    const manualTasksForThisNote: string[] = []
+    const allManualTasksForThisNote: string[] = []
 
     // 1. Manual Note Checklists (Tiptap HTML) - Primary Source of Truth
     if (note.content) {
-      const allManualTasksForThisNote: string[] = [];
       
       const regex = /<li([^>]*)>([\s\S]*?)<\/li>/gi;
       let match;
