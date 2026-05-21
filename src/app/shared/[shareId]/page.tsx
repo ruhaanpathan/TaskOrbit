@@ -64,9 +64,9 @@ export default async function SharedNotePage({ params }: { params: Promise<{ sha
           <p className="text-muted-foreground mb-8">
             This note either doesn't exist, has been deleted, or is no longer shared publicly by its owner.
           </p>
-          <Link href="/">
-            <Button className="w-full">Return to TaskOrbit</Button>
-          </Link>
+          <Button asChild className="w-full">
+            <Link href="/">Return to TaskOrbit</Link>
+          </Button>
         </div>
       </div>
     )
