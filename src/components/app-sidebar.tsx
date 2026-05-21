@@ -76,7 +76,10 @@ export function AppSidebar({ userId, userEmail }: AppSidebarProps) {
         <Button 
           variant="secondary"
           className="w-full justify-start gap-2 h-10 shadow-sm bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 dark:bg-blue-500/20 dark:text-blue-400 dark:hover:bg-blue-500/30"
-          onClick={() => window.open('https://meet.google.com/new', '_blank')}
+          onClick={() => {
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+            window.open(isMobile ? 'https://meet.google.com' : 'https://meet.google.com/new', '_blank')
+          }}
         >
           <Video className="w-4 h-4" />
           Start Meeting

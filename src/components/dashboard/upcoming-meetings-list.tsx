@@ -15,8 +15,10 @@ export function UpcomingMeetingsList({ initialTasks }: { initialTasks: PendingTa
     e.preventDefault()
     e.stopPropagation()
 
-    // 1. Open Google Meet in a new tab immediately so the user isn't blocked by DB update
-    window.open('https://meet.google.com/new', '_blank')
+    // On mobile the Google Meet app intercepts the URL but doesn't understand /new.
+    // Use the base URL so the app opens its home screen where "New Meeting" is the first button.
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    window.open(isMobile ? 'https://meet.google.com' : 'https://meet.google.com/new', '_blank')
 
     // 2. Mark the meeting as completed/started in the database
     setCompletingIndex(index)
