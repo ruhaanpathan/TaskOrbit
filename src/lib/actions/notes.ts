@@ -120,6 +120,7 @@ export async function updateNote(
   })
   revalidatePath(`/notes/${id}`)
   revalidatePath("/notes")
+  revalidatePath("/dashboard")
 }
 
 export async function addTagToNote(noteId: string, tagName: string, userId: string) {
@@ -187,13 +188,17 @@ export async function removeTagFromNote(noteId: string, tagId: string) {
 }
 
 export async function toggleNotePublic(noteId: string, userId: string, isPublic: boolean) {
-  await db.note.update({
+  const note = await db.note.update({
     where: { id: noteId, userId },
-    data: { isPublic }
+    data: { isPublic },
+    select: { shareId: true }
   })
 
   revalidatePath(`/notes/${noteId}`)
   revalidatePath("/notes")
+
+  // Return the shareId so the client can immediately use it for the copy link button
+  return { shareId: note.shareId }
 }
 
 export async function updateAiLogActionItems(logId: string, actionItems: any) {

@@ -78,7 +78,7 @@ export default async function SharedNotePage({ params }: { params: Promise<{ sha
         <article className="animate-in fade-in slide-in-from-bottom-4 duration-700">
           
           <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight mb-4 text-foreground leading-tight">
-            {note.title}
+            {note.title?.trim() || "Untitled Note"}
           </h1>
           
           {note.noteTags.length > 0 && (

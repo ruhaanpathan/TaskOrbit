@@ -48,6 +48,8 @@ export function NoteEditor({ note, userId }: NoteEditorProps) {
   const [title, setTitle] = useState(note.title)
   const [currentText, setCurrentText] = useState(note.content || "")
   const [isPublic, setIsPublic] = useState(note.isPublic)
+  // Store shareId in state so it's always in sync with what the DB returns
+  const [shareId, setShareId] = useState<string | null>(note.shareId)
   const [saveStatus, setSaveStatus] = useState<"Saved ✓" | "Saving..." | "">("")
   const [newTag, setNewTag] = useState("")
   const [isFormatting, setIsFormatting] = useState(false)
@@ -165,12 +167,20 @@ export function NoteEditor({ note, userId }: NoteEditorProps) {
   const handleTogglePublic = async () => {
     const newState = !isPublic
     setIsPublic(newState)
-    await toggleNotePublic(note.id, userId, newState)
+    const result = await toggleNotePublic(note.id, userId, newState)
+    // Update shareId from the DB response so Copy Link is never broken
+    if (result?.shareId) {
+      setShareId(result.shareId)
+    }
     toast.success(newState ? "Note is now public" : "Note is now private")
   }
 
   const copyShareLink = () => {
-    const url = `${window.location.origin}/shared/${note.shareId}`
+    if (!shareId) {
+      toast.error("Share link is not available yet. Please toggle public sharing again.")
+      return
+    }
+    const url = `${window.location.origin}/shared/${shareId}`
     navigator.clipboard.writeText(url)
     toast.success("Link copied to clipboard!")
   }

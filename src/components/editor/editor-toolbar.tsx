@@ -67,7 +67,14 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         size="sm"
         className="h-8 gap-1.5 ml-1 text-blue-600 bg-blue-500/10 hover:bg-blue-500/20 dark:text-blue-400 dark:bg-blue-500/20 dark:hover:bg-blue-500/30"
         onClick={() => {
-          editor.chain().focus().toggleTaskList().insertContent('🎥 Meeting: ').run()
+          if (editor.isActive("taskList")) {
+            // Already inside a task list — just insert the meeting prefix text
+            editor.chain().focus().insertContent("🎥 Meeting: ").run()
+          } else {
+            // Not in a task list yet — create a new task item with the prefix
+            editor.chain().focus().toggleTaskList().run()
+            editor.chain().focus().insertContent("🎥 Meeting: ").run()
+          }
         }}
         type="button"
       >
