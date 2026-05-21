@@ -146,19 +146,7 @@ export function ReminderSystem({ userId }: ReminderSystemProps) {
     return () => clearInterval(interval)
   }, [permission, userId])
 
-  // Render a tiny invisible button or subtle indicator if permissions are denied
-  if (permission !== "granted") {
-    return (
-      <div className="fixed bottom-4 right-4 z-50">
-        <button 
-          onClick={() => Notification.requestPermission().then(setPermission)}
-          className="bg-destructive text-destructive-foreground px-3 py-1 text-xs rounded-full shadow-lg"
-        >
-          Enable OS Notifications
-        </button>
-      </div>
-    )
-  }
-
+  // We will just return null here so the annoying floating button goes away.
+  // If you ever want notifications, you can just enable them in your browser settings directly!
   return null
 }
