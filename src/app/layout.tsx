@@ -13,6 +13,12 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "TaskOrbit Notes",
   description: "Collaborative AI Notes Workspace",
+  icons: {
+    // Explicitly override favicon.ico — Next.js serves src/app/icon.png at the /icon route
+    icon: [{ url: "/icon", type: "image/png", sizes: "any" }],
+    shortcut: [{ url: "/icon", type: "image/png" }],
+    apple: [{ url: "/icon", type: "image/png" }],
+  },
 };
 
 export default function RootLayout({
