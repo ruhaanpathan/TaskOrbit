@@ -20,9 +20,7 @@ export function ReminderSystem({ userId }: ReminderSystemProps) {
   }, [])
 
   useEffect(() => {
-    if (permission !== "granted") return
-
-    // Simple parser for absolute ("at 10am") and relative ("in 10 min") times
+    // We removed the early return so sounds and in-app toasts still work!    // Simple parser for absolute ("at 10am") and relative ("in 10 min") times
     const parseTimeForToday = (text: string): Date | null => {
       const lowerText = text.toLowerCase()
       
@@ -119,17 +117,21 @@ export function ReminderSystem({ userId }: ReminderSystemProps) {
 
           if (is10MinWarning && !notifiedSet.current.has(warningKey)) {
             playNotificationSound()
-            new Notification(`Reminder: ${task.noteTitle}`, {
-              body: `Upcoming in 10 mins: ${task.text}`,
-            })
+            if (permission === "granted") {
+              new Notification(`Reminder: ${task.noteTitle}`, {
+                body: `Upcoming in 10 mins: ${task.text}`,
+              })
+            }
             notifiedSet.current.add(warningKey)
           }
 
           if (isNow && !notifiedSet.current.has(nowKey)) {
             playNotificationSound()
-            new Notification(`Starting Now: ${task.noteTitle}`, {
-              body: task.text,
-            })
+            if (permission === "granted") {
+              new Notification(`Starting Now: ${task.noteTitle}`, {
+                body: task.text,
+              })
+            }
             toast.info(`Meeting starting now: ${task.text}`)
             notifiedSet.current.add(nowKey)
           }
