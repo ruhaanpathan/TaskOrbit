@@ -12,6 +12,10 @@ export async function signupUser(formData: FormData) {
     return { error: "Email and password are required" }
   }
 
+  if (password.length < 8) {
+    return { error: "Password must be at least 8 characters long" }
+  }
+
   const existingUser = await db.user.findUnique({ where: { email } })
   if (existingUser) {
     return { error: "User already exists" }
