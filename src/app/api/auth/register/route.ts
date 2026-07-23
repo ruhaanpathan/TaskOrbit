@@ -10,6 +10,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Missing email or password" }, { status: 400 });
     }
 
+    if (password.length < 8) {
+      return NextResponse.json({ message: "Password must be at least 8 characters long" }, { status: 400 });
+    }
+
     const existingUser = await db.user.findUnique({ where: { email } });
     if (existingUser) {
       return NextResponse.json({ message: "User already exists" }, { status: 400 });

@@ -71,7 +71,7 @@ export default async function NotesPage({
   const availableTags = tags.map(t => t.name)
 
   return (
-    <div className="max-w-6xl mx-auto h-full animate-in fade-in duration-500">
+    <div className="w-full h-full animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight">My Notes</h1>

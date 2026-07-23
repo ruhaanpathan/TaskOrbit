@@ -23,7 +23,7 @@ export default async function CalendarPage() {
 
   // We can pass the raw notes to a client component for interactive month navigation
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20">
+    <div className="w-full space-y-6 animate-in fade-in duration-500 pb-20">
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight">Calendar</h1>
         <p className="text-muted-foreground mt-1 font-medium">

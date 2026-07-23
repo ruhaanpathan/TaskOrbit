@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Metadata } from "next"
 import { FileText } from "lucide-react"
+
 import sanitizeHtml from "sanitize-html"
 
 // Strip HTML cleanly for Open Graph descriptions
@@ -73,6 +74,17 @@ export default async function SharedNotePage({ params }: { params: Promise<{ sha
     )
   }
 
+  const sanitizedContent = sanitizeHtml(note.content || "", {
+    allowedTags: sanitizeHtml.defaults.allowedTags.concat([
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'mark', 'input', 'ul', 'ol', 'li', 'p', 'br', 'blockquote', 'code', 'pre', 'hr'
+    ]),
+    allowedAttributes: {
+      ...sanitizeHtml.defaults.allowedAttributes,
+      '*': ['class', 'style', 'data-*'],
+      'input': ['type', 'checked', 'disabled', 'data-type'],
+    },
+  })
+
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-[720px] mx-auto px-6 py-16 md:py-24">
@@ -94,22 +106,10 @@ export default async function SharedNotePage({ params }: { params: Promise<{ sha
 
           <div className="w-full h-px bg-border my-8" />
 
-          {/* Prose container applies Tailwind Typography styles to raw HTML output */}
+          {/* Prose container applies Tailwind Typography styles to sanitized HTML output */}
           <div 
             className="prose prose-zinc dark:prose-invert max-w-none prose-p:leading-relaxed prose-headings:font-bold prose-a:text-primary hover:prose-a:underline prose-li:my-1"
-            dangerouslySetInnerHTML={{ 
-              __html: sanitizeHtml(note.content, {
-                allowedTags: sanitizeHtml.defaults.allowedTags.concat([
-                  'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'div', 'input'
-                ]),
-                allowedAttributes: {
-                  '*': ['class', 'style', 'data-*'],
-                  'a': ['href', 'name', 'target'],
-                  'img': ['src', 'srcset', 'alt', 'title', 'width', 'height', 'loading'],
-                  'input': ['type', 'checked', 'disabled']
-                }
-              })
-            }}
+            dangerouslySetInnerHTML={{ __html: sanitizedContent }}
           />
 
           <div className="w-full h-px bg-border my-12" />

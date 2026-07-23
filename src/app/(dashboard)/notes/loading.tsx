@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 
 export default function NotesLoading() {
   return (
-    <div className="max-w-6xl mx-auto h-full">
+    <div className="w-full h-full">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
         <div>
           <Skeleton className="h-9 w-48 mb-2" />

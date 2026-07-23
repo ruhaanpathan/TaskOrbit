@@ -21,7 +21,7 @@ export default function SignupPage() {
 
     try {
       const formData = new FormData(e.currentTarget)
-      const email = (formData.get("email") as string)?.trim().toLowerCase()
+      const email = formData.get("email") as string
       const password = formData.get("password") as string
 
       const res = await signupUser(formData)
@@ -39,7 +39,7 @@ export default function SignupPage() {
         })
 
         if (signInRes?.error) {
-          toast.error("Account created. Please log in.")
+          toast.error("Error signing in. Please go to login.")
           router.push("/login")
         } else {
           router.push("/dashboard")
@@ -71,8 +71,7 @@ export default function SignupPage() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" name="password" type="password" required minLength={8} />
-            <p className="text-[10px] text-muted-foreground">Must be at least 8 characters</p>
+            <Input id="password" name="password" type="password" minLength={8} placeholder="Must be at least 8 characters" required />
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
