@@ -21,7 +21,7 @@ export default function SignupPage() {
 
     try {
       const formData = new FormData(e.currentTarget)
-      const email = formData.get("email") as string
+      const email = (formData.get("email") as string)?.trim().toLowerCase()
       const password = formData.get("password") as string
 
       const res = await signupUser(formData)
@@ -39,7 +39,7 @@ export default function SignupPage() {
         })
 
         if (signInRes?.error) {
-          toast.error("Error signing in. Please go to login.")
+          toast.error("Account created. Please log in.")
           router.push("/login")
         } else {
           router.push("/dashboard")
