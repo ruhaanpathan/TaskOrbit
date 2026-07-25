@@ -110,7 +110,7 @@ export function VoiceRecorder({ editor }: VoiceRecorderProps) {
         }
       }, 1000)
 
-      toast.success("🎙️ Recording started — speak now")
+      toast.success("Recording started — speak now")
     } catch (err: any) {
       if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
         toast.error("Microphone access denied. Please allow microphone access in your browser settings and try again.")
@@ -135,7 +135,7 @@ export function VoiceRecorder({ editor }: VoiceRecorderProps) {
   }, [])
 
   const processAudio = async (audioBlob: Blob, mimeType: string) => {
-    const toastId = toast.loading("🤖 AI is transcribing and structuring your voice note...")
+    const toastId = toast.loading("AI is transcribing and structuring your voice note...")
 
     try {
       const formData = new FormData()
@@ -175,7 +175,7 @@ export function VoiceRecorder({ editor }: VoiceRecorderProps) {
         currentEditor.commands.focus("end")
       }
 
-      toast.success(`✅ Voice note "${title}" added to your note!`, { id: toastId })
+      toast.success(`Voice note "${title}" added to your note!`, { id: toastId })
     } catch (err: any) {
       console.error("Voice-to-note processing error:", err)
       toast.error(err.message || "Failed to process voice note. Please try again.", { id: toastId })

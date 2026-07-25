@@ -19,7 +19,8 @@ import {
   PlusCircle,
   BookOpen,
   Calendar,
-  Video
+  Video,
+  Sparkles
 } from "lucide-react"
 import { createNote } from "@/lib/actions/notes"
 
@@ -38,7 +39,7 @@ export function AppSidebar({ userId, userEmail }: AppSidebarProps) {
     setIsCreating(true)
     try {
       const noteId = await createNote(userId)
-      window.location.href = `/notes/${noteId}` // Use window.location to force a full refresh if needed, or router.push
+      window.location.href = `/notes/${noteId}`
     } catch (e) {
       console.error(e)
     } finally {
@@ -55,27 +56,32 @@ export function AppSidebar({ userId, userEmail }: AppSidebarProps) {
   ]
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full w-full bg-card border-r border-border/50 text-card-foreground">
+    <div className="flex flex-col h-full w-full bg-card/80 backdrop-blur-xl border-r border-border/60 text-card-foreground">
       {/* Header Logo */}
       <div className="p-6 pb-4 flex items-center gap-3">
-        <div className="bg-primary/10 p-2 rounded-lg">
-          <BookOpen className="w-6 h-6 text-primary" />
+        <div className="bg-primary/10 border border-primary/20 p-2 rounded-xl text-primary shadow-sm">
+          <BookOpen className="w-5 h-5" />
         </div>
-        <span className="text-xl font-bold tracking-tight">TaskOrbit</span>
+        <div className="flex flex-col">
+          <span className="text-lg font-extrabold tracking-tight">TaskOrbit</span>
+          <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">AI Workspace</span>
+        </div>
       </div>
 
-      <div className="px-4 py-2 space-y-2">
+      {/* Action Buttons */}
+      <div className="px-4 py-3 space-y-2">
         <Button 
           onClick={handleCreateNote} 
           disabled={isCreating}
-          className="w-full justify-start gap-2 h-10 shadow-sm"
+          className="w-full justify-start gap-2.5 h-10 shadow-sm font-semibold transition-all hover:scale-[1.01]"
         >
           <PlusCircle className="w-4 h-4" />
           {isCreating ? "Creating..." : "New Note"}
         </Button>
+
         <Button 
           variant="secondary"
-          className="w-full justify-start gap-2 h-10 shadow-sm bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 dark:bg-blue-500/20 dark:text-blue-400 dark:hover:bg-blue-500/30"
+          className="w-full justify-start gap-2.5 h-10 font-semibold shadow-sm bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 dark:bg-blue-500/15 dark:text-blue-400 dark:hover:bg-blue-500/25 transition-all"
           onClick={() => {
             const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
             window.open(isMobile ? 'https://meet.google.com' : 'https://meet.google.com/new', '_blank')
@@ -86,7 +92,8 @@ export function AppSidebar({ userId, userEmail }: AppSidebarProps) {
         </Button>
       </div>
 
-      <div className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+      {/* Nav Links */}
+      <div className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navLinks.map((link) => {
           const isActive = pathname.startsWith(link.href)
           const Icon = link.icon
@@ -95,29 +102,33 @@ export function AppSidebar({ userId, userEmail }: AppSidebarProps) {
               key={link.name}
               href={link.href}
               onClick={() => setIsOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors text-sm font-medium ${
+              className={`relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all text-xs font-semibold ${
                 isActive 
-                  ? "bg-primary/10 text-primary" 
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "bg-primary/10 text-primary font-bold shadow-sm" 
+                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
               }`}
             >
-              <Icon className="w-4 h-4" />
+              {isActive && (
+                <div className="absolute left-0 top-2 bottom-2 w-1 bg-primary rounded-r-full" />
+              )}
+              <Icon className={`w-4 h-4 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
               {link.name}
             </Link>
           )
         })}
       </div>
 
+      {/* Footer Profile & Controls */}
       <div className="p-4 mt-auto">
-        <Separator className="mb-4 bg-border/50" />
-        <div className="flex items-center justify-between mb-4 px-2">
-          <span className="text-xs text-muted-foreground truncate w-[140px]" title={userEmail}>
+        <Separator className="mb-4 bg-border/40" />
+        <div className="flex items-center justify-between mb-3 px-2">
+          <span className="text-xs text-muted-foreground font-medium truncate w-[140px]" title={userEmail}>
             {userEmail}
           </span>
           <Button 
             variant="ghost" 
             size="icon" 
-            className="w-8 h-8 rounded-full"
+            className="w-8 h-8 rounded-lg"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
             <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-muted-foreground" />
@@ -128,7 +139,7 @@ export function AppSidebar({ userId, userEmail }: AppSidebarProps) {
         <Button 
           variant="outline" 
           onClick={() => signOut({ callbackUrl: "/login" })} 
-          className="w-full justify-start gap-2 h-9 border-border/50 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors"
+          className="w-full justify-start gap-2 h-9 text-xs border-border/50 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors font-medium"
         >
           <LogOut className="w-4 h-4" />
           Sign Out
@@ -139,15 +150,17 @@ export function AppSidebar({ userId, userEmail }: AppSidebarProps) {
 
   return (
     <>
-      {/* Mobile Hamburger */}
-      <div className="md:hidden fixed top-0 left-0 w-full h-14 bg-background/80 backdrop-blur-md border-b z-40 flex items-center px-4">
-        <Button variant="ghost" size="icon" onClick={() => setIsOpen(true)}>
-          <Menu className="w-6 h-6" />
-        </Button>
-        <span className="ml-4 font-bold tracking-tight">TaskOrbit Workspace</span>
+      {/* Mobile Hamburger Header */}
+      <div className="md:hidden fixed top-0 left-0 w-full h-14 bg-background/80 backdrop-blur-xl border-b border-border/50 z-40 flex items-center justify-between px-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => setIsOpen(true)}>
+            <Menu className="w-5 h-5" />
+          </Button>
+          <span className="font-extrabold tracking-tight text-sm">TaskOrbit</span>
+        </div>
       </div>
 
-      {/* Mobile Overlay */}
+      {/* Mobile Drawer Overlay */}
       {isOpen && (
         <div 
           className="md:hidden fixed inset-0 bg-background/80 backdrop-blur-sm z-50 animate-in fade-in"
@@ -167,7 +180,7 @@ export function AppSidebar({ userId, userEmail }: AppSidebarProps) {
         </div>
       )}
 
-      {/* Desktop Sidebar */}
+      {/* Desktop Fixed Sidebar */}
       <div className="hidden md:flex flex-col w-[260px] fixed inset-y-0 z-30">
         <SidebarContent />
       </div>

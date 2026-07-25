@@ -71,11 +71,11 @@ export function EditorToolbar({ editor, onMagicFormat, isFormatting }: EditorToo
         onClick={() => {
           if (editor.isActive("taskList")) {
             // Already inside a task list — just insert the meeting prefix text
-            editor.chain().focus().insertContent("🎥 Meeting: ").run()
+            editor.chain().focus().insertContent("Meeting: ").run()
           } else {
             // Not in a task list yet — create a new task item with the prefix
             editor.chain().focus().toggleTaskList().run()
-            editor.chain().focus().insertContent("🎥 Meeting: ").run()
+            editor.chain().focus().insertContent("Meeting: ").run()
           }
         }}
         type="button"

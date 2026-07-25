@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { Bell, X, Clock, Trash2, Send, Sparkles } from "lucide-react"
+import { Bell, X, Clock, Trash2, Send, Sparkles, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
 
 interface CustomReminder {
@@ -49,14 +49,13 @@ function saveReminders(r: CustomReminder[]) {
 }
 
 // ---------- Natural Language Parser ----------
-// Returns { fireAt, description } or null if no time found
 function parseNaturalLanguage(input: string): { fireAt: number; description: string } | null {
   const text = input.trim()
   const lower = text.toLowerCase()
   let fireAt: number | null = null
   let matchedStr = ""
 
-  // ── Relative: "in X min(s)" / "in X hour(s)"
+  // Relative: "in X min(s)" / "in X hour(s)"
   const relMatch = lower.match(/\bin\s+(\d+)\s*(min(?:utes?)?|hr|hours?)\b/)
   if (relMatch) {
     const amount = parseInt(relMatch[1], 10)
@@ -66,7 +65,7 @@ function parseNaturalLanguage(input: string): { fireAt: number; description: str
     matchedStr = relMatch[0]
   }
 
-  // ── Absolute: "at 2pm", "at 14:00", "at 2:30 pm"
+  // Absolute: "at 2pm", "at 14:00", "at 2:30 pm"
   if (!fireAt) {
     const absMatch = lower.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/)
     if (absMatch) {
@@ -77,7 +76,6 @@ function parseNaturalLanguage(input: string): { fireAt: number; description: str
       if (ampm === "am" && hours === 12) hours = 0
       const d = new Date()
       d.setHours(hours, mins, 0, 0)
-      // If the time is already past today, schedule for tomorrow
       if (d.getTime() < Date.now()) d.setDate(d.getDate() + 1)
       fireAt = d.getTime()
       matchedStr = absMatch[0]
@@ -86,7 +84,6 @@ function parseNaturalLanguage(input: string): { fireAt: number; description: str
 
   if (!fireAt) return null
 
-  // Build description: strip time phrase + filler words, keep the task text
   const fillers = [
     /\bremind\s+me\b/gi, /\balert\s+me\b/gi, /\bnotify\s+me\b/gi,
     /\bto\b/gi, /\bi\s+have\b/gi, /\bi\s+want\s+to\b/gi,
@@ -110,18 +107,15 @@ export function CustomReminderWidget() {
   const inputRef = useRef<HTMLInputElement>(null)
   const firedSet = useRef<Set<string>>(new Set())
 
-  // Load & prune past reminders
   useEffect(() => {
     const stored = loadReminders().filter((r) => r.fireAt > Date.now())
     setReminders(stored); saveReminders(stored)
   }, [])
 
-  // Focus input when popover opens
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 80)
   }, [open])
 
-  // Live parse preview as user types
   useEffect(() => {
     if (!input.trim()) { setParsePreview(null); return }
     const result = parseNaturalLanguage(input)
@@ -133,7 +127,6 @@ export function CustomReminderWidget() {
     }
   }, [input])
 
-  // Check reminders every 5 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       const stored = loadReminders()
@@ -143,7 +136,7 @@ export function CustomReminderWidget() {
         if (r.fireAt <= now && !firedSet.current.has(r.id)) {
           firedSet.current.add(r.id)
           playChime()
-          toast.success(`⏰ ${r.label}`, {
+          toast.success(r.label, {
             duration: 12000,
             description: "Your reminder just fired!",
             action: { label: "Dismiss", onClick: () => {} },
@@ -162,7 +155,7 @@ export function CustomReminderWidget() {
     const updated = [...loadReminders(), r]
     saveReminders(updated); setReminders(updated)
     const time = new Date(fireAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    toast.success(`⏰ Reminder set!`, { description: `"${label}" at ${time}` })
+    toast.success("Reminder set!", { description: `"${label}" at ${time}` })
     setInput("")
   }, [])
 
@@ -170,7 +163,7 @@ export function CustomReminderWidget() {
     if (!input.trim()) return
     const result = parseNaturalLanguage(input)
     if (!result) {
-      toast.error("Couldn't understand the time. Try: \"remind me in 10 min\" or \"task at 5pm\"")
+      toast.error("Couldn't understand time. Try: \"remind me in 10 min\" or \"task at 5pm\"")
       return
     }
     addReminder(result.description, result.fireAt)
@@ -199,10 +192,10 @@ export function CustomReminderWidget() {
 
       {/* ── Panel ── */}
       {open && (
-        <div className="w-[340px] bg-card border shadow-2xl rounded-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-3 duration-200">
+        <div className="w-[340px] bg-card/95 backdrop-blur-xl border border-border/80 shadow-2xl rounded-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-3 duration-200">
 
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border/50 bg-muted/20">
             <div className="flex items-center gap-2">
               <Bell className="w-4 h-4 text-primary" />
               <span className="font-semibold text-sm">Reminders</span>
@@ -214,10 +207,10 @@ export function CustomReminderWidget() {
 
           <div className="p-4 space-y-4">
 
-            {/* ── Natural language input ── */}
+            {/* Natural language input */}
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
-                <Sparkles className="w-3 h-3" /> Natural language
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3 text-primary" /> Smart Reminder
               </p>
               <div className="flex gap-2">
                 <input
@@ -226,40 +219,34 @@ export function CustomReminderWidget() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleNaturalSubmit()}
-                  placeholder='e.g. "task at 5pm" or "remind me in 10 min"'
-                  className="flex-1 bg-background border rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition placeholder:text-muted-foreground/50"
+                  placeholder='e.g. "task at 5pm" or "in 10 min"'
+                  className="flex-1 bg-background border border-border/80 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition placeholder:text-muted-foreground/50"
                 />
                 <button
                   onClick={handleNaturalSubmit}
-                  className="px-3 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors shrink-0"
+                  className="px-3 py-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-colors shrink-0 flex items-center justify-center"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              {/* Live parse preview */}
               {parsePreview && (
                 <p className="text-[11px] text-primary mt-1.5 pl-1 flex items-center gap-1 animate-in fade-in duration-150">
                   <Clock className="w-3 h-3 shrink-0" />
                   Will remind: <span className="font-semibold">{parsePreview}</span>
                 </p>
               )}
-              {input.trim() && !parsePreview && (
-                <p className="text-[11px] text-muted-foreground mt-1.5 pl-1">
-                  Tip: include "in X min" or "at Xpm" to set a time
-                </p>
-              )}
             </div>
 
-            {/* ── Presets ── */}
+            {/* Presets */}
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Quick</p>
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Quick Presets</p>
               <div className="grid grid-cols-4 gap-2">
                 {PRESETS.map(({ label, minutes }) => (
                   <button
                     key={label}
                     onClick={() => handlePreset(minutes, label)}
-                    className="py-2 rounded-lg border text-xs font-semibold hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all text-center"
+                    className="py-1.5 rounded-lg border border-border/60 text-xs font-medium hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all text-center"
                   >
                     {label}
                   </button>
@@ -267,15 +254,15 @@ export function CustomReminderWidget() {
               </div>
             </div>
 
-            {/* ── Pending ── */}
+            {/* Pending */}
             {reminders.length > 0 ? (
               <div>
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                  Pending ({reminders.length})
+                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
+                  Active ({reminders.length})
                 </p>
-                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-0.5">
                   {reminders.map((r) => (
-                    <div key={r.id} className="flex items-center gap-2 p-2 rounded-xl bg-muted/40 border">
+                    <div key={r.id} className="flex items-center gap-2 p-2 rounded-xl bg-muted/30 border border-border/40">
                       <Clock className="w-3.5 h-3.5 text-primary shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium truncate">{r.label}</p>
@@ -291,19 +278,19 @@ export function CustomReminderWidget() {
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground text-center py-1">No pending reminders</p>
+              <p className="text-xs text-muted-foreground text-center py-1">No active reminders</p>
             )}
           </div>
         </div>
       )}
 
-      {/* ── FAB Bell ── */}
+      {/* FAB Bell */}
       <button
         onClick={() => setOpen((o) => !o)}
         title="Reminders"
         style={{ width: 52, height: 52 }}
-        className={`relative rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-105 active:scale-95
-          ${open ? "bg-primary text-primary-foreground" : "bg-card border text-foreground hover:bg-muted"}
+        className={`relative rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-105 active:scale-95
+          ${open ? "bg-primary text-primary-foreground shadow-primary/20" : "bg-card border border-border/80 text-foreground hover:bg-muted shadow-black/10"}
         `}
       >
         <Bell className={`w-5 h-5 ${open ? "" : "text-primary"}`} />

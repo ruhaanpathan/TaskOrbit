@@ -199,45 +199,43 @@ export default async function DashboardPage() {
 
       {/* Row 1: Stat Cards */}
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="shadow-sm border-primary/20 bg-primary/5">
+        <Card className="shadow-sm border-primary/20 bg-primary/5 backdrop-blur-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-semibold text-primary">Pending Tasks</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-primary">Pending Tasks</CardTitle>
             <CheckSquare className="w-4 h-4 text-primary opacity-80" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-primary">{pendingTasks.length}</div>
+            <div className="text-3xl font-extrabold tracking-tight text-primary">{pendingTasks.length}</div>
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-blue-500/20 bg-blue-500/5">
+        <Card className="shadow-sm border-blue-500/20 bg-blue-500/5 backdrop-blur-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-semibold text-blue-600 dark:text-blue-400">Meetings</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Meetings</CardTitle>
             <Video className="w-4 h-4 text-blue-600 dark:text-blue-400 opacity-80" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{upcomingMeetings.length}</div>
+            <div className="text-3xl font-extrabold tracking-tight text-blue-600 dark:text-blue-400">{upcomingMeetings.length}</div>
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm">
+        <Card className="shadow-sm bg-card/60 backdrop-blur-md border border-border/60">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">Total Notes</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Notes</CardTitle>
             <BookOpen className="w-4 h-4 text-primary opacity-80" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{totalNotes}</div>
+            <div className="text-3xl font-extrabold tracking-tight">{totalNotes}</div>
           </CardContent>
         </Card>
 
-
-
-        <Card className="shadow-sm">
+        <Card className="shadow-sm bg-card/60 backdrop-blur-md border border-border/60">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">Top Tag</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Top Tag</CardTitle>
             <TagIcon className="w-4 h-4 text-primary opacity-80" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold truncate tracking-tight">{mostUsedTag}</div>
+            <div className="text-3xl font-extrabold truncate tracking-tight">{mostUsedTag}</div>
           </CardContent>
         </Card>
       </div>
