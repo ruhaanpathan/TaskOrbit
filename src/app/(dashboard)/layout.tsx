@@ -33,7 +33,7 @@ export default async function DashboardLayout({
           <div className="flex items-center gap-1.5">
             <span>Designed & Built by</span>
             <a 
-              href="https://github.com/ruhaanpathan" 
+              href="https://www.linkedin.com/in/ruhaan-pathan-ab7bb0328/" 
               target="_blank" 
               rel="noreferrer" 
               className="font-bold text-foreground hover:text-primary transition-colors underline underline-offset-4"
