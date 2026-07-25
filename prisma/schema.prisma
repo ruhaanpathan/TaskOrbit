@@ -8,13 +8,25 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  name         String?
-  email        String    @unique
-  passwordHash String
-  notes        Note[]
-  tags         Tag[]
-  createdAt    DateTime  @default(now())
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  passwordHash  String?
+  emailVerified DateTime?
+  notes         Note[]
+  tags          Tag[]
+  createdAt     DateTime  @default(now())
+}
+
+model OtpToken {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  type      String   // "SIGNUP" | "FORGOT_PASSWORD"
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email, type])
 }
 
 model Note {

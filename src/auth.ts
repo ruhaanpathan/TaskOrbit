@@ -1,5 +1,6 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
+import Google from "next-auth/providers/google"
 import { authConfig } from "./auth.config"
 import { db } from "@/lib/db"
 import bcrypt from "bcryptjs"
@@ -9,6 +10,11 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "peblo-notes-auth-secret-key-2026",
   trustHost: true,
   providers: [
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      allowDangerousEmailAccountLinking: true,
+    }),
     Credentials({
       name: "Credentials",
       credentials: {
@@ -55,17 +61,46 @@ export const { auth, signIn, signOut, handlers } = NextAuth({
   ],
   callbacks: {
     ...authConfig.callbacks,
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
+    async signIn({ user, account }) {
+      if (account?.provider === "google" && user.email) {
+        try {
+          const cleanEmail = user.email.trim().toLowerCase()
+          let existingUser = await db.user.findUnique({
+            where: { email: cleanEmail }
+          })
+
+          if (!existingUser) {
+            existingUser = await db.user.create({
+              data: {
+                email: cleanEmail,
+                name: user.name || "Google User",
+                emailVerified: new Date(),
+              }
+            })
+          }
+          user.id = existingUser.id
+        } catch (e) {
+          console.error("Error creating Google user:", e)
+        }
       }
-      return token;
+      return true
+    },
+    async jwt({ token, user }) {
+      if (user?.email) {
+        const dbUser = await db.user.findUnique({
+          where: { email: user.email.trim().toLowerCase() }
+        })
+        if (dbUser) {
+          token.id = dbUser.id
+        }
+      }
+      return token
     },
     async session({ session, token }) {
       if (session.user && token.id) {
-        session.user.id = token.id as string;
+        session.user.id = token.id as string
       }
-      return session;
+      return session
     }
   },
   session: {

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { GoogleButton } from "@/components/auth/google-button"
 import { toast } from "sonner"
 
 export default function LoginPage() {
@@ -46,10 +47,21 @@ export default function LoginPage() {
     <Card className="w-full max-w-md shadow-lg border-primary/10">
       <CardHeader className="space-y-1">
         <CardTitle className="text-3xl font-bold tracking-tight text-center">Welcome back</CardTitle>
-        <CardDescription className="text-center">Enter your email and password to access your notes</CardDescription>
+        <CardDescription className="text-center">Sign in to your TaskOrbit workspace</CardDescription>
       </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4 pt-4">
+
+      <CardContent className="space-y-4 pt-4">
+        {/* Google OAuth Sign In */}
+        <GoogleButton text="Continue with Google" />
+
+        <div className="relative flex items-center justify-center my-4">
+          <div className="border-t border-border w-full" />
+          <span className="bg-card px-3 text-xs text-muted-foreground uppercase font-semibold relative shrink-0">
+            or continue with email
+          </span>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input 
@@ -61,8 +73,17 @@ export default function LoginPage() {
               required 
             />
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Link 
+                href="/forgot-password" 
+                className="text-xs text-primary font-medium hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <Input 
               id="password" 
               type="password" 
@@ -71,19 +92,21 @@ export default function LoginPage() {
               required 
             />
           </div>
-        </CardContent>
-        <CardFooter className="flex flex-col space-y-4">
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
+
+          <Button type="submit" className="w-full mt-2" disabled={loading}>
+            {loading ? "Signing in..." : "Sign in with Email"}
           </Button>
-          <div className="text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/signup" className="font-medium underline underline-offset-4 hover:text-primary">
-              Sign up
-            </Link>
-          </div>
-        </CardFooter>
-      </form>
+        </form>
+      </CardContent>
+
+      <CardFooter className="flex flex-col space-y-4">
+        <div className="text-center text-sm text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link href="/signup" className="font-medium underline underline-offset-4 hover:text-primary">
+            Sign up
+          </Link>
+        </div>
+      </CardFooter>
     </Card>
   )
 }
