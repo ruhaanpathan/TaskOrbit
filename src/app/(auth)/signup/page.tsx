@@ -21,13 +21,11 @@ export default function SignupPage() {
   const [password, setPassword] = useState("")
   const [otpCode, setOtpCode] = useState("")
   const [loading, setLoading] = useState(false)
-  const [devCode, setDevCode] = useState<string | null>(null)
 
   // Step 1: Request OTP
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setDevCode(null)
 
     try {
       const res = await requestSignupOtp({ name, email, password })
@@ -36,9 +34,6 @@ export default function SignupPage() {
         toast.error(res.error)
       } else {
         toast.success(`Verification code sent to ${res.email}`)
-        if (res.codeForDev) {
-          setDevCode(res.codeForDev)
-        }
         setStep("OTP")
       }
     } catch (error) {
@@ -61,7 +56,6 @@ export default function SignupPage() {
       } else {
         toast.success("Email verified! Signing you in...")
         
-        // Auto Sign In
         const signInRes = await signIn("credentials", {
           email,
           password,
@@ -92,14 +86,13 @@ export default function SignupPage() {
         <CardDescription className="text-center">
           {step === "DETAILS" 
             ? "Get started with your TaskOrbit workspace" 
-            : `Enter the 6-digit verification code sent to ${email}`}
+            : `Enter the 6-digit code sent to ${email}`}
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4 pt-4">
         {step === "DETAILS" ? (
           <>
-            {/* Google OAuth Sign In */}
             <GoogleButton text="Continue with Google" />
 
             <div className="relative flex items-center justify-center my-4">
@@ -112,37 +105,17 @@ export default function SignupPage() {
             <form onSubmit={handleRequestOtp} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Name (Optional)</Label>
-                <Input 
-                  id="name" 
-                  placeholder="John Doe" 
-                  value={name} 
-                  onChange={(e) => setName(e.target.value)} 
-                />
+                <Input id="name" placeholder="John Doe" value={name} onChange={(e) => setName(e.target.value)} />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input 
-                  id="email" 
-                  type="email" 
-                  placeholder="name@example.com" 
-                  value={email} 
-                  onChange={(e) => setEmail(e.target.value)} 
-                  required 
-                />
+                <Input id="email" type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <Input 
-                  id="password" 
-                  type="password" 
-                  placeholder="At least 8 characters" 
-                  minLength={8} 
-                  value={password} 
-                  onChange={(e) => setPassword(e.target.value)} 
-                  required 
-                />
+                <Input id="password" type="password" placeholder="At least 8 characters" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
 
               <Button type="submit" className="w-full gap-2" disabled={loading}>
@@ -152,14 +125,7 @@ export default function SignupPage() {
             </form>
           </>
         ) : (
-          /* Step 2: OTP Entry */
           <form onSubmit={handleVerifyOtp} className="space-y-5 animate-in fade-in">
-            {devCode && (
-              <div className="bg-primary/10 border border-primary/20 text-primary p-3 rounded-lg text-xs font-mono text-center">
-                🔑 Demo OTP Code: <strong className="text-sm select-all">{devCode}</strong>
-              </div>
-            )}
-
             <div className="space-y-2">
               <Label htmlFor="otpCode">6-Digit Verification Code</Label>
               <div className="relative">
@@ -174,6 +140,7 @@ export default function SignupPage() {
                   required 
                 />
               </div>
+              <p className="text-xs text-muted-foreground">Check your email inbox (and spam folder) for the code.</p>
             </div>
 
             <Button type="submit" className="w-full gap-2" disabled={loading || otpCode.length < 6}>
@@ -185,7 +152,7 @@ export default function SignupPage() {
               type="button" 
               variant="ghost" 
               className="w-full gap-2 text-xs text-muted-foreground"
-              onClick={() => setStep("DETAILS")}
+              onClick={() => { setStep("DETAILS"); setOtpCode("") }}
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Back to details
             </Button>

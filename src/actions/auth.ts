@@ -24,9 +24,13 @@ export async function requestSignupOtp(data: { name?: string; email: string; pas
 
   // Generate OTP & Send Email
   const code = await generateOtpToken(cleanEmail, "SIGNUP")
-  await sendOtpEmail(cleanEmail, code, "SIGNUP")
+  const mailResult = await sendOtpEmail(cleanEmail, code, "SIGNUP")
 
-  return { success: true, email: cleanEmail, codeForDev: code }
+  if (!mailResult.success) {
+    return { error: mailResult.error || "Failed to send verification email" }
+  }
+
+  return { success: true, email: cleanEmail }
 }
 
 // Step 2 Signup: Verify OTP and create user
@@ -64,9 +68,13 @@ export async function requestForgotPasswordOtp(email: string) {
   }
 
   const code = await generateOtpToken(cleanEmail, "FORGOT_PASSWORD")
-  await sendOtpEmail(cleanEmail, code, "FORGOT_PASSWORD")
+  const mailResult = await sendOtpEmail(cleanEmail, code, "FORGOT_PASSWORD")
 
-  return { success: true, email: cleanEmail, codeForDev: code }
+  if (!mailResult.success) {
+    return { error: mailResult.error || "Failed to send verification email" }
+  }
+
+  return { success: true, email: cleanEmail }
 }
 
 // Step 2 Forgot Password: Verify OTP

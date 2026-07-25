@@ -19,13 +19,11 @@ export default function ForgotPasswordPage() {
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [loading, setLoading] = useState(false)
-  const [devCode, setDevCode] = useState<string | null>(null)
 
   // Step 1: Request OTP
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    setDevCode(null)
 
     try {
       const res = await requestForgotPasswordOtp(email)
@@ -33,9 +31,6 @@ export default function ForgotPasswordPage() {
         toast.error(res.error)
       } else {
         toast.success(`Verification code sent to ${res.email}`)
-        if (res.codeForDev) {
-          setDevCode(res.codeForDev)
-        }
         setStep("OTP")
       }
     } catch (error) {
@@ -79,7 +74,7 @@ export default function ForgotPasswordPage() {
       if (res.error) {
         toast.error(res.error)
       } else {
-        toast.success("Password reset successfully! Please sign in with your new password.")
+        toast.success("Password reset successfully! Please sign in.")
         router.push("/login")
       }
     } catch (error) {
@@ -98,8 +93,8 @@ export default function ForgotPasswordPage() {
           {step === "NEW_PASSWORD" && "Set New Password"}
         </CardTitle>
         <CardDescription className="text-center">
-          {step === "EMAIL" && "Enter your registered email to receive a 6-digit verification code"}
-          {step === "OTP" && `Enter the 6-digit verification code sent to ${email}`}
+          {step === "EMAIL" && "Enter your registered email to receive a verification code"}
+          {step === "OTP" && `Enter the 6-digit code sent to ${email}`}
           {step === "NEW_PASSWORD" && "Create a new password for your account"}
         </CardDescription>
       </CardHeader>
@@ -110,14 +105,7 @@ export default function ForgotPasswordPage() {
           <form onSubmit={handleRequestOtp} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Registered Email</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                placeholder="name@example.com" 
-                value={email} 
-                onChange={(e) => setEmail(e.target.value)} 
-                required 
-              />
+              <Input id="email" type="email" placeholder="name@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
 
             <Button type="submit" className="w-full gap-2" disabled={loading}>
@@ -130,12 +118,6 @@ export default function ForgotPasswordPage() {
         {/* Step 2: OTP Entry */}
         {step === "OTP" && (
           <form onSubmit={handleVerifyOtp} className="space-y-5 animate-in fade-in">
-            {devCode && (
-              <div className="bg-primary/10 border border-primary/20 text-primary p-3 rounded-lg text-xs font-mono text-center">
-                🔑 Demo OTP Code: <strong className="text-sm select-all">{devCode}</strong>
-              </div>
-            )}
-
             <div className="space-y-2">
               <Label htmlFor="otpCode">6-Digit Verification Code</Label>
               <div className="relative">
@@ -150,6 +132,7 @@ export default function ForgotPasswordPage() {
                   required 
                 />
               </div>
+              <p className="text-xs text-muted-foreground">Check your email inbox (and spam folder) for the code.</p>
             </div>
 
             <Button type="submit" className="w-full gap-2" disabled={loading || otpCode.length < 6}>
@@ -161,7 +144,7 @@ export default function ForgotPasswordPage() {
               type="button" 
               variant="ghost" 
               className="w-full gap-2 text-xs text-muted-foreground"
-              onClick={() => setStep("EMAIL")}
+              onClick={() => { setStep("EMAIL"); setOtpCode("") }}
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Change email
             </Button>
@@ -175,16 +158,7 @@ export default function ForgotPasswordPage() {
               <Label htmlFor="newPassword">New Password</Label>
               <div className="relative">
                 <Lock className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-                <Input 
-                  id="newPassword" 
-                  type="password" 
-                  placeholder="At least 8 characters" 
-                  minLength={8} 
-                  className="pl-9"
-                  value={newPassword} 
-                  onChange={(e) => setNewPassword(e.target.value)} 
-                  required 
-                />
+                <Input id="newPassword" type="password" placeholder="At least 8 characters" minLength={8} className="pl-9" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required />
               </div>
             </div>
 
@@ -192,16 +166,7 @@ export default function ForgotPasswordPage() {
               <Label htmlFor="confirmPassword">Confirm New Password</Label>
               <div className="relative">
                 <Lock className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-                <Input 
-                  id="confirmPassword" 
-                  type="password" 
-                  placeholder="Repeat new password" 
-                  minLength={8} 
-                  className="pl-9"
-                  value={confirmPassword} 
-                  onChange={(e) => setConfirmPassword(e.target.value)} 
-                  required 
-                />
+                <Input id="confirmPassword" type="password" placeholder="Repeat new password" minLength={8} className="pl-9" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
               </div>
             </div>
 
