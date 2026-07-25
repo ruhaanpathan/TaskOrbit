@@ -80,14 +80,14 @@ export function AppSidebar({ userId, userEmail }: AppSidebarProps) {
         </Button>
 
         <Button 
-          variant="secondary"
-          className="w-full justify-start gap-2.5 h-10 font-semibold shadow-sm bg-blue-500/10 text-blue-600 hover:bg-blue-500/20 dark:bg-blue-500/15 dark:text-blue-400 dark:hover:bg-blue-500/25 transition-all"
+          variant="outline"
+          className="w-full justify-start gap-2.5 h-10 font-semibold shadow-sm border-border/80 hover:bg-muted transition-all"
           onClick={() => {
             const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
             window.open(isMobile ? 'https://meet.google.com' : 'https://meet.google.com/new', '_blank')
           }}
         >
-          <Video className="w-4 h-4" />
+          <Video className="w-4 h-4 text-foreground" />
           Start Meeting
         </Button>
       </div>
