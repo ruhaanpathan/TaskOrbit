@@ -21,7 +21,8 @@ import {
   Calendar,
   Users,
   Video,
-  Sparkles
+  Sparkles,
+  MessageSquareHeart
 } from "lucide-react"
 import { createNote } from "@/lib/actions/notes"
 
@@ -55,6 +56,7 @@ export function AppSidebar({ userId, userEmail }: AppSidebarProps) {
     { name: "Shared Tasks", href: "/shared-tasks", icon: Users },
     { name: "Calendar", href: "/calendar", icon: Calendar },
     { name: "Archive", href: "/archive", icon: Archive },
+    { name: "Feedback", href: "/feedback", icon: MessageSquareHeart },
   ]
 
   const SidebarContent = () => (

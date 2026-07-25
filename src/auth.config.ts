@@ -14,7 +14,8 @@ export const authConfig = {
         nextUrl.pathname.startsWith("/notes") ||
         nextUrl.pathname.startsWith("/shared-tasks") ||
         nextUrl.pathname.startsWith("/calendar") ||
-        nextUrl.pathname.startsWith("/archive")
+        nextUrl.pathname.startsWith("/archive") ||
+        nextUrl.pathname.startsWith("/feedback")
       
       if (isProtectedRoute) {
         if (isLoggedIn) return true

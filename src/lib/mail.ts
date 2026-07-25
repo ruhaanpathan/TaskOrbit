@@ -113,3 +113,103 @@ export async function sendOtpEmail(email: string, code: string, type: "SIGNUP" |
 
   return { success: true, code }
 }
+
+export async function sendFeedbackEmail({
+  category,
+  subject,
+  message,
+  senderEmail,
+  senderName,
+}: {
+  category: string
+  subject: string
+  message: string
+  senderEmail: string
+  senderName: string
+}) {
+  const targetEmail = "rkp2905t@gmail.com"
+  const smtpUser = process.env.SMTP_USER
+  const smtpPass = process.env.SMTP_PASS
+
+  const emailSubject = `[TaskOrbit Feedback] ${category}: ${subject}`
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 32px 20px; background: #ffffff; color: #111;">
+      <div style="border-bottom: 2px solid #6366f1; padding-bottom: 16px; margin-bottom: 24px;">
+        <h1 style="font-size: 22px; font-weight: 800; color: #111; margin: 0;">TaskOrbit User Feedback</h1>
+        <p style="font-size: 13px; color: #6b7280; margin: 4px 0 0;">New feedback submitted via TaskOrbit web app</p>
+      </div>
+
+      <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+        <div style="margin-bottom: 16px;">
+          <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; background: #eef2ff; color: #4f46e5; padding: 4px 10px; border-radius: 6px;">
+            Category: ${category}
+          </span>
+        </div>
+
+        <h2 style="font-size: 18px; font-weight: 700; color: #111827; margin: 0 0 12px;">${subject}</h2>
+        
+        <div style="font-size: 14px; line-height: 1.6; color: #374151; white-space: pre-wrap; background: #ffffff; padding: 16px; border-radius: 8px; border: 1px solid #e5e7eb;">
+          ${message}
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; text-align: left; font-size: 13px; color: #6b7280;">
+        <p style="margin: 4px 0;"><strong>Sender Name:</strong> ${senderName || "Anonymous"}</p>
+        <p style="margin: 4px 0;"><strong>Sender Email:</strong> <a href="mailto:${senderEmail}" style="color: #4f46e5;">${senderEmail}</a></p>
+        <p style="margin: 4px 0;"><strong>Submitted At:</strong> ${new Date().toLocaleString()}</p>
+      </div>
+    </div>
+  `
+
+  if (smtpUser && smtpPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: smtpUser.trim(),
+          pass: smtpPass.trim().replace(/\s+/g, ""),
+        },
+      })
+
+      await transporter.sendMail({
+        from: `TaskOrbit Feedback <${smtpUser.trim()}>`,
+        to: targetEmail,
+        replyTo: senderEmail,
+        subject: emailSubject,
+        html,
+      })
+
+      console.log(`✅ Feedback email delivered to ${targetEmail} via Gmail SMTP`)
+      return { success: true }
+    } catch (error: any) {
+      console.error("❌ Gmail SMTP Error:", error)
+      return { success: false, error: error?.message || "Failed to send feedback email" }
+    }
+  }
+
+  // Resend API fallback
+  const resendApiKey = process.env.RESEND_API_KEY
+  if (resendApiKey) {
+    try {
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${resendApiKey.trim()}`,
+        },
+        body: JSON.stringify({
+          from: "TaskOrbit Feedback <onboarding@resend.dev>",
+          to: [targetEmail],
+          replyTo: senderEmail,
+          subject: emailSubject,
+          html,
+        }),
+      })
+      return { success: true }
+    } catch (error: any) {
+      return { success: false, error: error?.message || "Failed via Resend" }
+    }
+  }
+
+  return { success: true }
+}
