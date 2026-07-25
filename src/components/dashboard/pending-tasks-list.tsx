@@ -13,6 +13,8 @@ export type PendingTask = {
   text: string;
   logId?: string;
   taskIndex?: number;
+  ownerName?: string;
+  companyFolderName?: string;
 }
 
 export function PendingTasksList({ initialTasks }: { initialTasks: PendingTask[] }) {

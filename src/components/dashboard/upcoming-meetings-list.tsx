@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Sparkles, CheckCircle2, FileText, Loader2, Video, ExternalLink, CalendarPlus } from "lucide-react"
+import { CheckCircle2, FileText, Loader2, Video, ExternalLink, CalendarPlus, Building2, User } from "lucide-react"
 import Link from "next/link"
 import { completeTaskGlobal } from "@/lib/actions/dashboard"
 import { toast } from "sonner"
@@ -36,7 +36,7 @@ export function UpcomingMeetingsList({ initialTasks }: { initialTasks: PendingTa
   if (tasks.length === 0) {
     return (
       <div className="p-8 text-center text-muted-foreground text-sm">
-        No upcoming meetings! You're schedule is clear.
+        No upcoming meetings! Your schedule is clear.
       </div>
     )
   }
@@ -74,64 +74,82 @@ export function UpcomingMeetingsList({ initialTasks }: { initialTasks: PendingTa
         }
 
         return (
-        <div 
-          key={`${task.noteId}-${i}`} 
-          className="flex flex-col sm:flex-row sm:items-start justify-between p-4 sm:px-6 hover:bg-muted/50 transition-colors group relative overflow-hidden gap-3 sm:gap-6"
-        >
-          <div className="flex items-start gap-1 flex-1">
-            {/* Start Meeting Button */}
-            <button 
-              onClick={(e) => handleStartMeeting(e, task, i)}
-              disabled={completingIndex === i}
-              className="shrink-0 p-2 -ml-2 -mt-1.5 transition-colors group/btn flex items-center justify-center cursor-pointer"
-              title="Start Google Meet"
-            >
-              {completingIndex === i ? (
-                <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-              ) : (
-                <div className="relative flex items-center justify-center">
-                  <div className="bg-blue-500/10 p-1.5 rounded-full text-blue-600 dark:text-blue-400 group-hover/btn:bg-blue-500 group-hover/btn:text-white transition-colors">
-                    <Video className="w-4 h-4" />
+          <div 
+            key={`${task.noteId}-${i}`} 
+            className="flex flex-col sm:flex-row sm:items-start justify-between p-4 sm:px-6 hover:bg-muted/50 transition-colors group relative overflow-hidden gap-3 sm:gap-6"
+          >
+            <div className="flex items-start gap-1 flex-1">
+              {/* Start Meeting Button */}
+              <button 
+                onClick={(e) => handleStartMeeting(e, task, i)}
+                disabled={completingIndex === i}
+                className="shrink-0 p-2 -ml-2 -mt-1.5 transition-colors group/btn flex items-center justify-center cursor-pointer"
+                title="Start Google Meet"
+              >
+                {completingIndex === i ? (
+                  <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+                ) : (
+                  <div className="relative flex items-center justify-center">
+                    <div className="bg-blue-500/10 p-1.5 rounded-full text-blue-600 dark:text-blue-400 group-hover/btn:bg-blue-500 group-hover/btn:text-white transition-colors">
+                      <Video className="w-4 h-4" />
+                    </div>
                   </div>
+                )}
+              </button>
+              
+              {/* Task Text */}
+              <div className="flex flex-col">
+                <p className={`text-sm font-medium leading-snug transition-all duration-300 ${completingIndex === i ? 'text-muted-foreground line-through' : (isDelayed ? 'text-destructive font-bold' : 'text-foreground')}`}>
+                  {task.text}
+                </p>
+                <div className="flex items-center gap-3 mt-1">
+                  <div className={`flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider ${isDelayed ? 'text-destructive/80' : 'text-blue-600/70'}`}>
+                    <ExternalLink className="w-3 h-3" /> {isDelayed ? 'Overdue - Start Immediately!' : 'Click camera icon to start'}
+                  </div>
+                  {gcalLink && (
+                    <a 
+                      href={gcalLink} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      <CalendarPlus className="w-3 h-3" /> Add to GCal
+                    </a>
+                  )}
                 </div>
-              )}
-            </button>
+              </div>
+            </div>
             
-            {/* Task Text */}
-            <div className="flex flex-col">
-              <p className={`text-sm font-medium leading-snug transition-all duration-300 ${completingIndex === i ? 'text-muted-foreground line-through' : (isDelayed ? 'text-destructive font-bold' : 'text-foreground')}`}>
-                {task.text}
-              </p>
-              <div className="flex items-center gap-3 mt-1">
-                <div className={`flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider ${isDelayed ? 'text-destructive/80' : 'text-blue-600/70'}`}>
-                  <ExternalLink className="w-3 h-3" /> {isDelayed ? 'Overdue - Start Immediately!' : 'Click camera icon to start'}
-                </div>
-                {gcalLink && (
-                  <a 
-                    href={gcalLink} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    <CalendarPlus className="w-3 h-3" /> Add to GCal
-                  </a>
+            {/* RIGHT SIDE: Note Title & Badges */}
+            <div className="flex flex-col items-start sm:items-end gap-1 shrink-0 ml-10 sm:ml-0 pt-0.5">
+              <Link 
+                href={`/notes/${task.noteId}`}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary hover:underline transition-colors"
+                title={`Open note: ${task.noteTitle}`}
+              >
+                <FileText className="w-3 h-3" />
+                <span className="truncate max-w-[150px] sm:max-w-[200px]">
+                  {task.noteTitle}
+                </span>
+              </Link>
+
+              {/* Company Folder & Owner Badges */}
+              <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground">
+                {task.companyFolderName && (
+                  <span className="inline-flex items-center gap-1 text-primary font-bold bg-primary/10 px-1.5 py-0.5 rounded">
+                    <Building2 className="w-2.5 h-2.5" /> {task.companyFolderName}
+                  </span>
+                )}
+
+                {task.ownerName && (
+                  <span className="inline-flex items-center gap-0.5 text-muted-foreground font-medium bg-muted/50 px-1.5 py-0.5 rounded">
+                    <User className="w-2.5 h-2.5 opacity-70" /> by {task.ownerName}
+                  </span>
                 )}
               </div>
             </div>
+
           </div>
-          
-          {/* RIGHT SIDE: Note Title */}
-          <Link 
-            href={`/notes/${task.noteId}`}
-            className="flex items-center gap-1.5 ml-10 sm:ml-0 text-xs text-muted-foreground hover:text-primary hover:underline transition-colors shrink-0 pt-0.5"
-            title={`Open note: ${task.noteTitle}`}
-          >
-            <FileText className="w-3 h-3" />
-            <span className="truncate max-w-[150px] sm:max-w-[200px]">
-              {task.noteTitle}
-            </span>
-          </Link>
-        </div>
         )
       })}
     </div>

@@ -3,7 +3,6 @@ import { redirect } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SearchBar } from "@/components/search/search-bar"
 import { ReminderSystem } from "@/components/reminder-system"
-import { CustomReminderWidget } from "@/components/custom-reminder"
 
 export default async function DashboardLayout({
   children,
@@ -29,8 +28,6 @@ export default async function DashboardLayout({
           {children}
         </div>
       </main>
-      {/* Floating custom reminder bell — available on every dashboard page */}
-      <CustomReminderWidget />
     </div>
   )
 }

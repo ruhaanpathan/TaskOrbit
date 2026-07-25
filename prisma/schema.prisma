@@ -8,14 +8,19 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  passwordHash  String?
-  emailVerified DateTime?
-  notes         Note[]
-  tags          Tag[]
-  createdAt     DateTime  @default(now())
+  id                 String              @id @default(cuid())
+  name               String?
+  email              String              @unique
+  passwordHash       String?
+  emailVerified      DateTime?
+  notes              Note[]
+  tags               Tag[]
+  companyWorkspaces  CompanyWorkspace[]
+  collaborations     TaskCollaborator[]
+  joinRequests       TaskJoinRequest[]
+  comments           TaskComment[]
+  notifications      Notification[]
+  createdAt          DateTime            @default(now())
 }
 
 model OtpToken {
@@ -29,19 +34,95 @@ model OtpToken {
   @@index([email, type])
 }
 
+model CompanyWorkspace {
+  id        String   @id @default(cuid())
+  name      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes     Note[]
+  createdAt DateTime @default(now())
+}
+
 model Note {
-  id         String    @id @default(cuid())
-  title      String    @default("Untitled")
-  content    String    @default("")
-  isArchived Boolean   @default(false)
-  isPublic   Boolean   @default(false)
-  shareId    String?   @unique @default(cuid())
-  userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  noteTags   NoteTag[]
-  aiLogs     AiLog[]
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  id                 String              @id @default(cuid())
+  title              String              @default("Untitled")
+  content            String              @default("")
+  isArchived         Boolean             @default(false)
+  isPublic           Boolean             @default(false)
+  shareId            String?             @unique @default(cuid())
+  userId             String
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyWorkspaceId String?
+  companyWorkspace   CompanyWorkspace?   @relation(fields: [companyWorkspaceId], references: [id], onDelete: SetNull)
+  noteTags           NoteTag[]
+  aiLogs             AiLog[]
+  collaborators      TaskCollaborator[]
+  joinRequests       TaskJoinRequest[]
+  checkItems         TaskCheckItem[]
+  comments           TaskComment[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+}
+
+model TaskCollaborator {
+  id        String   @id @default(cuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String   @default("COLLABORATOR") // "OWNER" | "COLLABORATOR"
+  joinedAt  DateTime @default(now())
+
+  @@unique([noteId, userId])
+}
+
+model TaskJoinRequest {
+  id        String   @id @default(cuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    String   @default("PENDING") // "PENDING" | "ACCEPTED" | "REJECTED"
+  createdAt DateTime @default(now())
+
+  @@unique([noteId, userId])
+}
+
+model TaskCheckItem {
+  id                String   @id @default(cuid())
+  noteId            String
+  note              Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  taskText          String
+  completedByUserId String
+  completedByName   String
+  status            String   @default("PENDING_REVIEW") // "PENDING_REVIEW" | "APPROVED" | "REJECTED"
+  completedAt       DateTime @default(now())
+
+  @@unique([noteId, taskText])
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  taskText  String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userName  String
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // "JOIN_REQUEST" | "REQUEST_ACCEPTED" | "TASK_COMPLETED" | "TASK_COMMENT"
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
 
 model Tag {

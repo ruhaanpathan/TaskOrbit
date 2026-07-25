@@ -3,11 +3,12 @@ import { db } from "@/lib/db"
 import { redirect } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { BookOpen, Wand2, Archive, Tag as TagIcon, FileText, ChevronRight, CheckSquare, Sparkles, CheckCircle2, Clock, ArrowRight, Video } from "lucide-react"
+import { BookOpen, Tag as TagIcon, FileText, CheckSquare, Users, Video } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import Link from "next/link"
 import { WeeklyActivityChart } from "@/components/dashboard/weekly-activity-chart"
 import { PendingTasksList, type PendingTask } from "@/components/dashboard/pending-tasks-list"
+import { SharedTeamTasksDashboardList, type SharedDashboardTask } from "@/components/dashboard/shared-team-tasks-list"
 import { UpcomingMeetingsList } from "@/components/dashboard/upcoming-meetings-list"
 
 export default async function DashboardPage() {
@@ -19,13 +20,7 @@ export default async function DashboardPage() {
   // 1. totalNotes
   const totalNotes = await db.note.count({ where: { userId, isArchived: false } })
   
-  // 2. archivedNotes
-  const archivedNotes = await db.note.count({ where: { userId, isArchived: true } })
-  
-  // 3. totalAiUsage
-  const totalAiUsage = await db.aiLog.count({ where: { note: { userId } } })
-  
-  // 4. topTags (excluding archived notes)
+  // 2. topTags (excluding archived notes)
   const topTags = await db.$queryRaw<{ name: string, count: number }[]>`
     SELECT t.name, CAST(COUNT(nt."noteId") AS INTEGER) as count 
     FROM "Tag" t 
@@ -38,7 +33,7 @@ export default async function DashboardPage() {
   `
   const maxTagCount = topTags.length > 0 ? topTags[0].count : 1
 
-  // 5. weeklyActivity
+  // 3. weeklyActivity
   const sevenDaysAgo = new Date()
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
   sevenDaysAgo.setHours(0, 0, 0, 0)
@@ -75,7 +70,7 @@ export default async function DashboardPage() {
     count
   }))
 
-  // 6. recentNotes
+  // 4. recentNotes
   const recentNotes = await db.note.findMany({
     where: { userId, isArchived: false },
     orderBy: { updatedAt: 'desc' },
@@ -83,117 +78,162 @@ export default async function DashboardPage() {
     include: { noteTags: { include: { tag: true } } }
   })
 
-  const mostUsedTag = topTags.length > 0 ? topTags[0].name : "None"
-
-  // 7. global pending tasks
-  const allActiveNotes = await db.note.findMany({
-    where: { userId, isArchived: false },
+  // 5. Personal (Private) Notes
+  const personalNotes = await db.note.findMany({
+    where: { userId, isArchived: false, isPublic: false },
     include: {
-      aiLogs: {
-        orderBy: { createdAt: 'desc' },
-        take: 1
+      aiLogs: { orderBy: { createdAt: 'desc' }, take: 1 }
+    }
+  })
+
+  // 6. Shared (Team) Notes (Owned + Joined)
+  const sharedOwnedNotes = await db.note.findMany({
+    where: { userId, isArchived: false, isPublic: true },
+    include: {
+      user: { select: { name: true, email: true } },
+      companyWorkspace: true,
+      checkItems: true,
+      aiLogs: { orderBy: { createdAt: 'desc' }, take: 1 }
+    }
+  })
+
+  const joinedCollaboratorNotes = await db.taskCollaborator.findMany({
+    where: { userId },
+    include: {
+      note: {
+        include: {
+          user: { select: { name: true, email: true } },
+          companyWorkspace: true,
+          checkItems: true,
+          aiLogs: { orderBy: { createdAt: 'desc' }, take: 1 }
+        }
       }
     }
   })
 
-  const rawPendingTasks: PendingTask[] = []
-  
-  allActiveNotes.forEach(note => {
-    // Temporary store for manual tasks to check for duplicates
-    const allManualTasksForThisNote: string[] = []
-
-    // 1. Manual Note Checklists (Tiptap HTML) - Primary Source of Truth
+  // Extract Personal Tasks
+  const rawPersonalTasks: PendingTask[] = []
+  personalNotes.forEach(note => {
     if (note.content) {
-      
-      const regex = /<li([^>]*)>([\s\S]*?)<\/li>/gi;
-      let match;
+      const regex = /<li([^>]*)>([\s\S]*?)<\/li>/gi
+      let match
       while ((match = regex.exec(note.content)) !== null) {
-        const attributes = match[1];
-        if (attributes.includes('data-type="taskItem"')) {
-          let rawText = match[2].replace(/<[^>]*>/g, '').trim();
+        const attributes = match[1]
+        if (attributes.includes('data-type="taskItem"') && attributes.includes('data-checked="false"')) {
+          let rawText = match[2].replace(/<[^>]*>/g, '').trim()
           if (rawText) {
-            allManualTasksForThisNote.push(rawText);
-            
-            // Only add to dashboard pending tasks if it's unchecked
-            if (attributes.includes('data-checked="false"')) {
-              rawPendingTasks.push({ type: 'manual', noteId: note.id, noteTitle: note.title, text: rawText });
-            }
+            rawPersonalTasks.push({ type: 'manual', noteId: note.id, noteTitle: note.title, text: rawText })
           }
         }
       }
-    }
-
-    // Smart Deduplication Helper
-    const isDuplicate = (aiText: string, manualTasks: string[]) => {
-      const getWords = (text: string) => new Set(text.toLowerCase().split(/\W+/).filter(w => w.length > 3))
-      const aiWords = getWords(aiText)
-      
-      for (const manualTask of manualTasks) {
-        const manualWords = getWords(manualTask)
-        if (aiWords.size === 0 || manualWords.size === 0) {
-          if (aiText.toLowerCase().includes(manualTask.toLowerCase()) || manualTask.toLowerCase().includes(aiText.toLowerCase())) return true
-          continue
-        }
-        
-        let overlap = 0
-        for (const w of aiWords) {
-          if (manualWords.has(w)) overlap++
-        }
-        
-        const minWords = Math.min(aiWords.size, manualWords.size)
-        // If > 40% of words overlap, consider it a duplicate!
-        if ((overlap / minWords) > 0.4) return true
-      }
-      return false
-    }
-
-    // 2. AI Generated Action Items - Only add if not a duplicate
-    if (note.aiLogs.length > 0) {
-      const latestLog = note.aiLogs[0]
-      try {
-        const items = typeof latestLog.actionItems === 'string' ? JSON.parse(latestLog.actionItems) : []
-        items.forEach((item: any, i: number) => {
-          const isCompleted = typeof item === 'object' ? item.completed : false
-          const text = typeof item === 'object' ? item.text : item
-          
-          if (!isCompleted && text) {
-            // Check if this AI task is essentially a duplicate of ANY manual checklist item (checked or unchecked)
-            if (!isDuplicate(text, allManualTasksForThisNote)) {
-              rawPendingTasks.push({ 
-                type: 'ai', 
-                noteId: note.id, 
-                noteTitle: note.title, 
-                text,
-                logId: latestLog.id,
-                taskIndex: i
-              })
-            }
-          }
-        })
-      } catch (e) {}
     }
   })
 
-  // Separate tasks and meetings
-  const pendingTasks: PendingTask[] = []
+  // Extract Shared Team Tasks with Member Completion Attribution
+  const rawSharedTasks: SharedDashboardTask[] = []
+  const sharedNotesList = [...sharedOwnedNotes, ...joinedCollaboratorNotes.map((c) => c.note)]
+  const processedTaskKeys = new Set<string>()
+
+  sharedNotesList.forEach(note => {
+    const isOwner = note.userId === userId
+    const ownerName = note.user?.name || note.user?.email || "Owner"
+    const companyFolderName = note.companyWorkspace?.name
+
+    const checkItemsMap = new Map<string, any>()
+    note.checkItems?.forEach((item: any) => {
+      checkItemsMap.set(item.taskText.trim(), item)
+    })
+
+    if (note.content) {
+      const regex = /<li([^>]*)>([\s\S]*?)<\/li>/gi
+      let match
+      while ((match = regex.exec(note.content)) !== null) {
+        const attributes = match[1]
+        if (attributes.includes('data-type="taskItem"')) {
+          let rawText = match[2].replace(/<[^>]*>/g, '').trim()
+          if (!rawText) continue
+
+          const taskKey = `${note.id}-${rawText}`
+          if (processedTaskKeys.has(taskKey)) continue
+          processedTaskKeys.add(taskKey)
+
+          const checkItem = checkItemsMap.get(rawText)
+          const isDocChecked = attributes.includes('data-checked="true"')
+
+          // If doc is checked AND no pending review item, task is fully completed
+          if (isDocChecked && (!checkItem || checkItem.status === "APPROVED")) {
+            continue
+          }
+
+          // If member checked it or doc is unchecked:
+          if (checkItem && checkItem.status !== "APPROVED") {
+            rawSharedTasks.push({
+              noteId: note.id,
+              shareId: note.shareId || note.id,
+              noteTitle: note.title,
+              text: rawText,
+              checkItemId: checkItem.id,
+              completedByName: checkItem.completedByName,
+              completedAt: checkItem.completedAt,
+              isCompletedByMember: true,
+              isOwner,
+              ownerName,
+              companyFolderName
+            })
+          } else if (!isDocChecked) {
+            rawSharedTasks.push({
+              noteId: note.id,
+              shareId: note.shareId || note.id,
+              noteTitle: note.title,
+              text: rawText,
+              isCompletedByMember: false,
+              isOwner,
+              ownerName,
+              companyFolderName
+            })
+          }
+        }
+      }
+    }
+  })
+
+  // Separate meetings
+  const personalTasks: PendingTask[] = []
+  const sharedTasks: SharedDashboardTask[] = []
   const upcomingMeetings: PendingTask[] = []
 
-  rawPendingTasks.forEach(task => {
+  rawPersonalTasks.forEach(task => {
     const textLower = task.text.toLowerCase()
     if (textLower.includes('meet') || textLower.includes('call') || textLower.includes('zoom') || textLower.includes('sync')) {
       upcomingMeetings.push(task)
     } else {
-      pendingTasks.push(task)
+      personalTasks.push(task)
+    }
+  })
+
+  rawSharedTasks.forEach(task => {
+    const textLower = task.text.toLowerCase()
+    if (textLower.includes('meet') || textLower.includes('call') || textLower.includes('zoom') || textLower.includes('sync')) {
+      upcomingMeetings.push({ 
+        type: 'manual', 
+        noteId: task.noteId, 
+        noteTitle: task.noteTitle, 
+        text: task.text,
+        ownerName: task.ownerName,
+        companyFolderName: task.companyFolderName
+      })
+    } else {
+      sharedTasks.push(task)
     }
   })
 
   return (
-    <div className="w-full space-y-8 animate-in fade-in duration-500">
+    <div className="w-full space-y-8 animate-in fade-in duration-500 pb-20">
       
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground mt-1 font-medium">
-          Welcome back! Here's a summary of your workspace activity.
+        <p className="text-muted-foreground mt-1 font-medium text-sm">
+          Welcome back! Here's a summary of your personal & shared team tasks.
         </p>
       </div>
 
@@ -201,11 +241,21 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="shadow-sm bg-card border border-border/80">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Pending Tasks</CardTitle>
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Personal Tasks</CardTitle>
             <CheckSquare className="w-4 h-4 text-foreground opacity-80" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-extrabold tracking-tight">{pendingTasks.length}</div>
+            <div className="text-3xl font-extrabold tracking-tight">{personalTasks.length}</div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm bg-card border border-border/80">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Shared Team Tasks</CardTitle>
+            <Users className="w-4 h-4 text-primary opacity-80" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-extrabold tracking-tight text-primary">{sharedTasks.length}</div>
           </CardContent>
         </Card>
 
@@ -228,109 +278,85 @@ export default async function DashboardPage() {
             <div className="text-3xl font-extrabold tracking-tight">{totalNotes}</div>
           </CardContent>
         </Card>
-
-        <Card className="shadow-sm bg-card border border-border/80">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Top Tag</CardTitle>
-            <TagIcon className="w-4 h-4 text-foreground opacity-80" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-extrabold truncate tracking-tight">{mostUsedTag}</div>
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Row 2: Pending Tasks and Meetings */}
+      {/* Row 2: Strictly Separated Personal vs Shared Team Action Items */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pending Action Items */}
-        <Card className="shadow-sm border-primary/10 overflow-hidden flex flex-col max-h-[400px]">
+        
+        {/* Personal Action Items */}
+        <Card className="shadow-sm border-border/80 overflow-hidden flex flex-col max-h-[400px]">
           <CardHeader className="bg-muted/20 border-b shrink-0">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <CheckSquare className="w-5 h-5 text-primary" />
-              Global Action Items
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <CheckSquare className="w-4 h-4 text-foreground" />
+              Personal Action Items
             </CardTitle>
-            <CardDescription>Your pending tasks across all active notes</CardDescription>
+            <CardDescription className="text-xs">Tasks from your private personal notes</CardDescription>
           </CardHeader>
           <CardContent className="p-0 overflow-y-auto bg-background">
-            <PendingTasksList initialTasks={pendingTasks} />
+            <PendingTasksList initialTasks={personalTasks} />
           </CardContent>
         </Card>
 
+        {/* Shared Team Tasks */}
+        <Card className="shadow-sm border-border/80 overflow-hidden flex flex-col max-h-[400px]">
+          <CardHeader className="bg-muted/20 border-b shrink-0">
+            <CardTitle className="text-base font-bold flex items-center justify-between">
+              <span className="flex items-center gap-2 text-foreground">
+                <Users className="w-4 h-4 text-foreground" />
+                Shared Team Tasks
+              </span>
+              <Link href="/shared-tasks" className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline">
+                View All →
+              </Link>
+            </CardTitle>
+            <CardDescription className="text-xs">Collaborative tasks distributed with your team</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 overflow-y-auto bg-background">
+            <SharedTeamTasksDashboardList initialTasks={sharedTasks} />
+          </CardContent>
+        </Card>
+
+      </div>
+
+      {/* Row 3: Upcoming Meetings & Weekly Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
         {/* Upcoming Meetings */}
-        <Card className="shadow-sm border-blue-500/10 overflow-hidden flex flex-col max-h-[400px]">
-          <CardHeader className="bg-blue-500/5 border-b border-blue-500/10 shrink-0">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2 text-blue-600 dark:text-blue-400">
-              <Video className="w-5 h-5" />
+        <Card className="shadow-sm border-border/80 overflow-hidden flex flex-col max-h-[350px]">
+          <CardHeader className="bg-muted/20 border-b shrink-0">
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <Video className="w-4 h-4 text-foreground" />
               Upcoming Meetings
             </CardTitle>
-            <CardDescription>Action items categorized as meetings or calls</CardDescription>
+            <CardDescription className="text-xs">Action items categorized as meetings or calls</CardDescription>
           </CardHeader>
           <CardContent className="p-0 overflow-y-auto bg-background">
             <UpcomingMeetingsList initialTasks={upcomingMeetings} />
           </CardContent>
         </Card>
-      </div>
 
-      {/* Row 3: Charts and Tags */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        
-        {/* Weekly Activity (60%) */}
-        <Card className="lg:col-span-3 shadow-sm border-primary/10">
+        {/* Weekly Activity */}
+        <Card className="shadow-sm border-border/80">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold">Weekly Activity</CardTitle>
-            <CardDescription>Notes updated over the past 7 days</CardDescription>
+            <CardTitle className="text-base font-bold">Weekly Activity</CardTitle>
+            <CardDescription className="text-xs">Notes updated over the past 7 days</CardDescription>
           </CardHeader>
-          <CardContent className="pt-2">
+          <CardContent className="pt-0">
             <WeeklyActivityChart data={weeklyActivity} />
           </CardContent>
         </Card>
 
-        {/* Top Tags (40%) */}
-        <Card className="lg:col-span-2 shadow-sm border-primary/10 flex flex-col">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">Top Tags</CardTitle>
-            <CardDescription>Your most frequently used tags</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6 pt-2 flex-1 flex flex-col justify-center">
-            {topTags.length === 0 ? (
-              <div className="text-sm text-muted-foreground italic text-center w-full">
-                No tags used yet.
-              </div>
-            ) : (
-              topTags.map((tag) => {
-                const percentage = Math.max(5, Math.round((tag.count / maxTagCount) * 100))
-                return (
-                  <div key={tag.name} className="space-y-2 group">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium flex items-center gap-1.5 group-hover:text-primary transition-colors">
-                        <TagIcon className="w-3 h-3 text-muted-foreground group-hover:text-primary" />
-                        {tag.name}
-                      </span>
-                      <span className="text-muted-foreground font-medium">{tag.count}</span>
-                    </div>
-                    <div className="h-2.5 w-full bg-secondary rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary rounded-full transition-all duration-1000 ease-out" 
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                )
-              })
-            )}
-          </CardContent>
-        </Card>
       </div>
 
       {/* Row 4: Recent Notes */}
       <div className="grid grid-cols-1 gap-6">
-        <Card className="shadow-sm border-primary/10 overflow-hidden flex flex-col max-h-[400px]">
+        <Card className="shadow-sm border-border/80 overflow-hidden flex flex-col max-h-[400px]">
           <CardHeader className="bg-muted/20 border-b shrink-0">
-            <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <FileText className="w-5 h-5 text-primary" />
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <FileText className="w-4 h-4 text-foreground" />
               Recent Notes
             </CardTitle>
-            <CardDescription>Your 5 most recently updated notes</CardDescription>
+            <CardDescription className="text-xs">Your 5 most recently updated notes</CardDescription>
           </CardHeader>
           <CardContent className="p-0 overflow-y-auto">
             <div className="divide-y divide-border">

@@ -19,6 +19,7 @@ import {
   PlusCircle,
   BookOpen,
   Calendar,
+  Users,
   Video,
   Sparkles
 } from "lucide-react"
@@ -51,6 +52,7 @@ export function AppSidebar({ userId, userEmail }: AppSidebarProps) {
   const navLinks = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { name: "Notes", href: "/notes", icon: FileText },
+    { name: "Shared Tasks", href: "/shared-tasks", icon: Users },
     { name: "Calendar", href: "/calendar", icon: Calendar },
     { name: "Archive", href: "/archive", icon: Archive },
   ]

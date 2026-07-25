@@ -12,6 +12,7 @@ export const authConfig = {
       const isProtectedRoute = 
         nextUrl.pathname.startsWith("/dashboard") || 
         nextUrl.pathname.startsWith("/notes") ||
+        nextUrl.pathname.startsWith("/shared-tasks") ||
         nextUrl.pathname.startsWith("/calendar") ||
         nextUrl.pathname.startsWith("/archive")
       
