@@ -356,87 +356,74 @@ export async function reviewSharedTaskCompletion(
 ) {
   const user = await getRequireUser()
 
-  let checkItem = await db.taskCheckItem.findUnique({
-    where: { id: checkItemId },
-    include: { note: true }
-  })
+  let checkItem = checkItemId
+    ? await db.taskCheckItem.findUnique({
+        where: { id: checkItemId },
+        include: { note: { include: { collaborators: { include: { user: { select: { email: true, name: true } } } } } } }
+      })
+    : null
 
-  // Fallback lookup by noteId + taskText if checkItemId wasn't found directly
   if (!checkItem && noteId && taskText) {
     const cleanText = taskText.trim()
     checkItem = await db.taskCheckItem.findFirst({
       where: { noteId, taskText: cleanText },
-      include: { note: true }
+      include: { note: { include: { collaborators: { include: { user: { select: { email: true, name: true } } } } } } }
     })
   }
 
-  if (!checkItem) {
-    // If no TaskCheckItem row exists, but owner approves/rejects directly
-    if (noteId && taskText) {
-      const note = await db.note.findUnique({ where: { id: noteId } })
-      if (!note || note.userId !== user.id) return { error: "Only the owner can review tasks" }
-
-      const cleanText = taskText.trim()
-      if (action === "APPROVE" && note.content) {
-        const liRegex = /<li[^>]*>[\s\S]*?<\/li>/gi
-        let newContent = note.content
-        let liMatch
-        while ((liMatch = liRegex.exec(note.content)) !== null) {
-          const originalLi = liMatch[0]
-          if (originalLi.includes('data-type="taskItem"')) {
-            const rawText = originalLi.replace(/<[^>]*>/g, '').trim()
-            if (rawText === cleanText) {
-              const updatedLi = originalLi.replace('data-checked="false"', 'data-checked="true"')
-              newContent = newContent.replace(originalLi, updatedLi)
-              break
-            }
-          }
-        }
-        await db.note.update({ where: { id: note.id }, data: { content: newContent } })
-      }
-      return { success: true }
-    }
-    return { error: "Task completion record not found" }
+  // Get note object
+  let note = checkItem?.note || null
+  if (!note && noteId) {
+    note = await db.note.findUnique({
+      where: { id: noteId },
+      include: { collaborators: { include: { user: { select: { email: true, name: true } } } } }
+    })
   }
 
-  if (checkItem.note.userId !== user.id) {
-    return { error: "Only the owner can review completed tasks" }
-  }
+  if (!note) return { error: "Task list not found" }
+  if (note.userId !== user.id) return { error: "Only the owner can review completed tasks" }
 
-  // Safely resolve member email to prevent Prisma null query errors
-  let memberEmail: string | null = null
+  const cleanText = (taskText || checkItem?.taskText || "").trim()
 
-  if (checkItem.completedByUserId) {
+  // 1. Resolve recipient emails (collaborators on this note)
+  const recipientEmails: string[] = []
+
+  if (checkItem?.completedByUserId) {
     const memberUser = await db.user.findUnique({
       where: { id: checkItem.completedByUserId },
-      select: { email: true, name: true }
+      select: { email: true }
     })
-    memberEmail = memberUser?.email || null
-  }
-
-  if (!memberEmail && checkItem.completedByName?.includes("@")) {
-    memberEmail = checkItem.completedByName.trim()
-  }
-
-  if (!memberEmail) {
-    const noteWithCollaborators = await db.note.findUnique({
-      where: { id: checkItem.noteId },
-      include: { collaborators: { include: { user: { select: { email: true } } } } }
-    })
-    if (noteWithCollaborators?.collaborators?.length === 1) {
-      memberEmail = noteWithCollaborators.collaborators[0].user?.email || null
+    if (memberUser?.email && memberUser.email !== user.email) {
+      recipientEmails.push(memberUser.email)
     }
   }
 
-  if (action === "APPROVE") {
-    // 1. Update status to APPROVED
-    await db.taskCheckItem.update({
-      where: { id: checkItem.id },
-      data: { status: "APPROVED" }
+  if (recipientEmails.length === 0 && checkItem?.completedByName?.includes("@")) {
+    const email = checkItem.completedByName.trim()
+    if (email !== user.email) recipientEmails.push(email)
+  }
+
+  if (recipientEmails.length === 0 && note.collaborators?.length > 0) {
+    note.collaborators.forEach((col: any) => {
+      if (col.user?.email && col.user.email !== user.email && !recipientEmails.includes(col.user.email)) {
+        recipientEmails.push(col.user.email)
+      }
     })
+  }
+
+  const ownerDisplayName = user.name || user.email || "Owner"
+  const appUrl = getAppBaseUrl()
+
+  if (action === "APPROVE") {
+    // 1. If checkItem exists, update status to APPROVED
+    if (checkItem) {
+      await db.taskCheckItem.update({
+        where: { id: checkItem.id },
+        data: { status: "APPROVED" }
+      })
+    }
 
     // 2. Mark task as checked in the note's HTML content
-    const note = checkItem.note
     if (note.content) {
       const liRegex = /<li[^>]*>[\s\S]*?<\/li>/gi
       let newContent = note.content
@@ -446,7 +433,7 @@ export async function reviewSharedTaskCompletion(
         const originalLi = liMatch[0]
         if (originalLi.includes('data-type="taskItem"')) {
           const rawText = originalLi.replace(/<[^>]*>/g, '').trim()
-          if (rawText === checkItem.taskText.trim()) {
+          if (rawText === cleanText) {
             const updatedLi = originalLi.replace('data-checked="false"', 'data-checked="true"')
             newContent = newContent.replace(originalLi, updatedLi)
             break
@@ -461,15 +448,15 @@ export async function reviewSharedTaskCompletion(
     }
 
     // 3. In-app Notification for member
-    if (checkItem.completedByUserId) {
+    if (checkItem?.completedByUserId) {
       try {
         await db.notification.create({
           data: {
             userId: checkItem.completedByUserId,
             type: "TASK_APPROVED",
             title: "Task Approved!",
-            message: `Your completion of "${checkItem.taskText}" in "${checkItem.note.title}" was approved by the owner.`,
-            link: `/shared/${checkItem.note.shareId}`
+            message: `Your completion of "${cleanText}" in "${note.title}" was approved by the owner.`,
+            link: `/shared/${note.shareId}`
           }
         })
       } catch (e) {
@@ -477,10 +464,9 @@ export async function reviewSharedTaskCompletion(
       }
     }
 
-    // 4. Email Notification to member (non-blocking)
-    if (memberEmail) {
+    // 4. Email Notification to all member emails
+    for (const email of recipientEmails) {
       try {
-        const ownerDisplayName = user.name || user.email || "Owner"
         const html = `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 20px; background: #ffffff; color: #111;">
             <div style="border-bottom: 2px solid #22c55e; padding-bottom: 16px; margin-bottom: 24px;">
@@ -490,7 +476,7 @@ export async function reviewSharedTaskCompletion(
 
             <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
               <p style="font-size: 14px; color: #166534; margin: 0 0 16px;">
-                Great job! Your completion of <strong>"${checkItem.taskText}"</strong> in <strong>"${checkItem.note.title}"</strong> was accepted and approved by the owner <strong>(${ownerDisplayName})</strong>.
+                Great job! Your completion of <strong>"${cleanText}"</strong> in <strong>"${note.title}"</strong> was accepted and approved by the owner <strong>(${ownerDisplayName})</strong>.
               </p>
               <div style="background: #ffffff; border: 1px solid #86efac; color: #15803d; padding: 14px 18px; border-radius: 8px; font-weight: 700; font-size: 15px;">
                 ✓ Approved & Completed
@@ -500,8 +486,8 @@ export async function reviewSharedTaskCompletion(
         `
 
         await sendTaskNotificationEmail({
-          to: memberEmail,
-          subject: formatShortTaskSubject("Task Approved! 🎉", checkItem.taskText, checkItem.note.title),
+          to: email,
+          subject: formatShortTaskSubject("Task Approved! 🎉", cleanText, note.title),
           html
         })
       } catch (e) {
@@ -509,19 +495,21 @@ export async function reviewSharedTaskCompletion(
       }
     }
   } else {
-    // REJECT: Delete completion record and uncheck task in note HTML so it resets completely
-    await db.taskCheckItem.delete({ where: { id: checkItem.id } })
+    // REJECT: Delete completion record if exists, and uncheck task in note HTML so it resets completely
+    if (checkItem) {
+      await db.taskCheckItem.delete({ where: { id: checkItem.id } })
+    }
 
-    if (checkItem.note.content) {
+    if (note.content) {
       const liRegex = /<li[^>]*>[\s\S]*?<\/li>/gi
-      let newContent = checkItem.note.content
+      let newContent = note.content
       let liMatch
 
-      while ((liMatch = liRegex.exec(checkItem.note.content)) !== null) {
+      while ((liMatch = liRegex.exec(note.content)) !== null) {
         const originalLi = liMatch[0]
         if (originalLi.includes('data-type="taskItem"')) {
           const rawText = originalLi.replace(/<[^>]*>/g, '').trim()
-          if (rawText === checkItem.taskText.trim()) {
+          if (rawText === cleanText) {
             const updatedLi = originalLi.replace('data-checked="true"', 'data-checked="false"')
             newContent = newContent.replace(originalLi, updatedLi)
             break
@@ -530,21 +518,21 @@ export async function reviewSharedTaskCompletion(
       }
 
       await db.note.update({
-        where: { id: checkItem.note.id },
+        where: { id: note.id },
         data: { content: newContent }
       })
     }
 
     // In-app Notification for member
-    if (checkItem.completedByUserId) {
+    if (checkItem?.completedByUserId) {
       try {
         await db.notification.create({
           data: {
             userId: checkItem.completedByUserId,
             type: "TASK_REJECTED",
             title: "Task Revision Requested",
-            message: `Your completion of "${checkItem.taskText}" in "${checkItem.note.title}" was not approved by the owner. Please review and redo.`,
-            link: `/shared/${checkItem.note.shareId}`
+            message: `Your completion of "${cleanText}" in "${note.title}" was not approved by the owner. Please review and redo.`,
+            link: `/shared/${note.shareId}`
           }
         })
       } catch (e) {
@@ -552,11 +540,9 @@ export async function reviewSharedTaskCompletion(
       }
     }
 
-    // Email Notification to member (non-blocking)
-    if (memberEmail) {
+    // Email Notification to all member emails
+    for (const email of recipientEmails) {
       try {
-        const ownerDisplayName = user.name || user.email || "Owner"
-        const appUrl = getAppBaseUrl()
         const html = `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 20px; background: #ffffff; color: #111;">
             <div style="border-bottom: 2px solid #ef4444; padding-bottom: 16px; margin-bottom: 24px;">
@@ -566,7 +552,7 @@ export async function reviewSharedTaskCompletion(
 
             <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
               <p style="font-size: 14px; color: #991b1b; margin: 0 0 16px;">
-                Your completion of <strong>"${checkItem.taskText}"</strong> in <strong>"${checkItem.note.title}"</strong> was not approved by the owner <strong>(${ownerDisplayName})</strong>.
+                Your completion of <strong>"${cleanText}"</strong> in <strong>"${note.title}"</strong> was not approved by the owner <strong>(${ownerDisplayName})</strong>.
               </p>
               <p style="font-size: 13px; color: #7f1d1d; margin: 0;">
                 The task has been reset to unchecked. Please review and redo the work as requested.
@@ -574,7 +560,7 @@ export async function reviewSharedTaskCompletion(
             </div>
 
             <div style="text-align: center;">
-              <a href="${appUrl}/shared/${checkItem.note.shareId}" style="display: inline-block; background: #dc2626; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 14px;">
+              <a href="${appUrl}/shared/${note.shareId}" style="display: inline-block; background: #dc2626; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 14px;">
                 View Task List →
               </a>
             </div>
@@ -582,8 +568,8 @@ export async function reviewSharedTaskCompletion(
         `
 
         await sendTaskNotificationEmail({
-          to: memberEmail,
-          subject: formatShortTaskSubject("Task Revision Requested ⚠️", checkItem.taskText, checkItem.note.title),
+          to: email,
+          subject: formatShortTaskSubject("Task Revision Requested ⚠️", cleanText, note.title),
           html
         })
       } catch (e) {
