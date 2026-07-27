@@ -30,6 +30,11 @@ export function SharedTeamTasksDashboardList({ initialTasks }: { initialTasks: S
   // Handle checking off a task directly from the Dashboard
   const handleToggleTaskFromDashboard = async (task: SharedDashboardTask, index: number) => {
     const isCurrentlyChecked = !!task.isCompletedByMember
+    if (isCurrentlyChecked && !task.isOwner) {
+      toast.error("Only the task owner can uncheck completed tasks")
+      return
+    }
+
     const nextChecked = !isCurrentlyChecked
     setTogglingTaskText(task.text)
 

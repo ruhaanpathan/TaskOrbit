@@ -86,6 +86,11 @@ export function SharedNoteTaskClient({ initialData, shareId }: { initialData: an
       return
     }
 
+    if (currentCompleted && !isOwner) {
+      toast.error("Only the task owner can uncheck completed tasks")
+      return
+    }
+
     const nextCompleted = !currentCompleted
     try {
       const res = await toggleCollaborativeTask(shareId, taskText, nextCompleted)
@@ -287,7 +292,10 @@ export function SharedNoteTaskClient({ initialData, shareId }: { initialData: an
               Tasks & Action Items
             </h2>
             <span className="text-xs text-muted-foreground font-medium">
-              {note.checkItems.length} completed
+              {tasks.filter((t) => {
+                const c = note.checkItems.find((ci: any) => ci.taskText === t.text)
+                return (!!c && c.status !== "REJECTED") || t.isChecked
+              }).length} of {tasks.length} completed
             </span>
           </div>
 
@@ -299,7 +307,7 @@ export function SharedNoteTaskClient({ initialData, shareId }: { initialData: an
             <div className="space-y-3">
               {tasks.map((task, idx) => {
                 const completion = note.checkItems.find((c: any) => c.taskText === task.text)
-                const isChecked = !!completion || task.isChecked
+                const isChecked = (!!completion && completion.status !== "REJECTED") || task.isChecked
                 const commentsForTask = note.comments.filter((c: any) => c.taskText === task.text)
 
                 return (

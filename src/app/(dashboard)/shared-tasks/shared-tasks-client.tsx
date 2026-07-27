@@ -352,7 +352,24 @@ export function SharedTasksDashboardClient({ initialData }: { initialData: any }
             const collaboratorsList = note.collaborators || []
             const collaboratorsCount = collaboratorsList.length + 1
             const pendingReqsCount = note.joinRequests?.length || 0
-            const completedTasksCount = note.checkItems?.length || 0
+            const completedTaskTexts = new Set<string>()
+            note.checkItems?.forEach((item: any) => {
+              if (item.status !== "REJECTED") {
+                completedTaskTexts.add(item.taskText.trim())
+              }
+            })
+            if (note.content) {
+              const regex = /<li([^>]*)>([\s\S]*?)<\/li>/gi
+              let match
+              while ((match = regex.exec(note.content)) !== null) {
+                const attributes = match[1]
+                if (attributes.includes('data-checked="true"')) {
+                  let rawText = match[2].replace(/<[^>]*>/g, '').trim()
+                  if (rawText) completedTaskTexts.add(rawText)
+                }
+              }
+            }
+            const completedTasksCount = completedTaskTexts.size
             const commentsCount = note.comments?.length || 0
 
             return (

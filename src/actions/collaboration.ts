@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth"
 import { db } from "@/lib/db"
+import { sendTaskNotificationEmail } from "@/lib/mail"
 
 // Helper to get logged in user
 async function getRequireUser() {
@@ -227,7 +228,7 @@ export async function toggleCollaborativeTask(shareId: string, taskText: string,
         data: { content: newContent }
       })
     } else if (!isOwner) {
-      // Notify Owner if a collaborator checks off a task
+      // 1. In-app notification for Owner
       await db.notification.create({
         data: {
           userId: note.userId,
@@ -237,16 +238,78 @@ export async function toggleCollaborativeTask(shareId: string, taskText: string,
           link: `/shared/${shareId}`
         }
       })
+
+      // 2. Email notification to Task Owner
+      const ownerUser = await db.user.findUnique({
+        where: { id: note.userId },
+        select: { email: true, name: true }
+      })
+
+      if (ownerUser?.email) {
+        const memberDisplayName = user.name || user.email || "Team Member"
+        const appUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+        const html = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 20px; background: #ffffff; color: #111;">
+            <div style="border-bottom: 2px solid #6366f1; padding-bottom: 16px; margin-bottom: 24px;">
+              <h1 style="font-size: 20px; font-weight: 800; color: #111; margin: 0;">TaskOrbit</h1>
+              <p style="font-size: 13px; color: #6b7280; margin: 4px 0 0;">Shared Task Completed — Review Required</p>
+            </div>
+
+            <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+              <p style="font-size: 14px; color: #374151; margin: 0 0 16px;">
+                <strong>${memberDisplayName}</strong> completed a task in your shared list <strong>"${note.title}"</strong>:
+              </p>
+
+              <div style="background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3; padding: 14px 18px; border-radius: 8px; font-weight: 700; font-size: 15px; margin-bottom: 16px;">
+                ✓ ${cleanTaskText}
+              </div>
+
+              <p style="font-size: 13px; color: #6b7280; margin: 0;">
+                Please log in to your TaskOrbit dashboard to review and <strong>Accept</strong> or <strong>Reject</strong> this task.
+              </p>
+            </div>
+
+            <div style="text-align: center;">
+              <a href="${appUrl}/shared/${shareId}" style="display: inline-block; background: #6366f1; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 14px;">
+                Review Task on TaskOrbit →
+              </a>
+            </div>
+          </div>
+        `
+
+// Helper to format short, clean email subjects even if task content is long
+function formatShortTaskSubject(prefix: string, taskText: string, noteTitle?: string) {
+  const cleanText = taskText.trim().replace(/\s+/g, ' ')
+  const shortTask = cleanText.length > 35 ? cleanText.substring(0, 35) + '...' : cleanText
+  if (noteTitle) {
+    const cleanTitle = noteTitle.trim().replace(/\s+/g, ' ')
+    const shortTitle = cleanTitle.length > 25 ? cleanTitle.substring(0, 25) + '...' : cleanTitle
+    return `[TaskOrbit] ${prefix}: "${shortTask}" in "${shortTitle}"`
+  }
+  return `[TaskOrbit] ${prefix}: "${shortTask}"`
+}
+
+        await sendTaskNotificationEmail({
+          to: ownerUser.email,
+          subject: formatShortTaskSubject("Task Review Required", cleanTaskText, note.title),
+          html
+        })
+      }
     }
 
     return { success: true, checkItem }
   } else {
-    // Unchecked -> remove completion record and uncheck in HTML if owner
+    // Only the owner is allowed to uncheck completed tasks!
+    if (!isOwner) {
+      return { error: "Only the owner can uncheck tasks" }
+    }
+
+    // Unchecked -> remove completion record and uncheck in HTML
     await db.taskCheckItem.deleteMany({
       where: { noteId: note.id, taskText: cleanTaskText }
     })
 
-    if (isOwner && note.content) {
+    if (note.content) {
       const liRegex = /<li[^>]*>[\s\S]*?<\/li>/gi
       let newContent = note.content
       let liMatch
@@ -285,6 +348,11 @@ export async function reviewSharedTaskCompletion(checkItemId: string, action: "A
   if (!checkItem) return { error: "Task completion record not found" }
   if (checkItem.note.userId !== user.id) return { error: "Only the owner can review completed tasks" }
 
+  const memberUser = await db.user.findUnique({
+    where: { id: checkItem.completedByUserId },
+    select: { email: true, name: true }
+  })
+
   if (action === "APPROVE") {
     // 1. Update status to APPROVED
     await db.taskCheckItem.update({
@@ -317,7 +385,7 @@ export async function reviewSharedTaskCompletion(checkItemId: string, action: "A
       })
     }
 
-    // 3. Notify member
+    // 3. In-app Notification for member
     await db.notification.create({
       data: {
         userId: checkItem.completedByUserId,
@@ -327,11 +395,62 @@ export async function reviewSharedTaskCompletion(checkItemId: string, action: "A
         link: `/shared/${checkItem.note.shareId}`
       }
     })
+
+    // 4. Email Notification to member
+    if (memberUser?.email) {
+      const ownerDisplayName = user.name || user.email || "Owner"
+      const html = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 20px; background: #ffffff; color: #111;">
+          <div style="border-bottom: 2px solid #22c55e; padding-bottom: 16px; margin-bottom: 24px;">
+            <h1 style="font-size: 20px; font-weight: 800; color: #111; margin: 0;">TaskOrbit</h1>
+            <p style="font-size: 13px; color: #16a34a; font-weight: 700; margin: 4px 0 0;">🎉 Task Completion Approved!</p>
+          </div>
+
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+            <p style="font-size: 14px; color: #166534; margin: 0 0 16px;">
+              Great job! Your completion of <strong>"${checkItem.taskText}"</strong> in <strong>"${checkItem.note.title}"</strong> was accepted and approved by the owner <strong>(${ownerDisplayName})</strong>.
+            </p>
+            <div style="background: #ffffff; border: 1px solid #86efac; color: #15803d; padding: 14px 18px; border-radius: 8px; font-weight: 700; font-size: 15px;">
+              ✓ Approved & Completed
+            </div>
+          </div>
+        </div>
+      `
+
+      await sendTaskNotificationEmail({
+        to: memberUser.email,
+        subject: formatShortTaskSubject("Task Approved! 🎉", checkItem.taskText, checkItem.note.title),
+        html
+      })
+    }
   } else {
-    // REJECT: Delete completion record so it resets to unchecked for members
+    // REJECT: Delete completion record and uncheck task in note HTML so it resets completely
     await db.taskCheckItem.delete({ where: { id: checkItemId } })
 
-    // Notify member
+    if (checkItem.note.content) {
+      const liRegex = /<li[^>]*>[\s\S]*?<\/li>/gi
+      let newContent = checkItem.note.content
+      let liMatch
+
+      while ((liMatch = liRegex.exec(checkItem.note.content)) !== null) {
+        const originalLi = liMatch[0]
+        if (originalLi.includes('data-type="taskItem"')) {
+          const rawText = originalLi.replace(/<[^>]*>/g, '').trim()
+          if (rawText === checkItem.taskText.trim()) {
+            const updatedLi = originalLi.replace('data-checked="true"', 'data-checked="false"')
+            newContent = newContent.replace(originalLi, updatedLi)
+            break
+          }
+        }
+      }
+
+      await db.note.update({
+        where: { id: checkItem.note.id },
+        data: { content: newContent }
+      })
+    }
+
+    // In-app Notification for member
     await db.notification.create({
       data: {
         userId: checkItem.completedByUserId,
@@ -341,6 +460,41 @@ export async function reviewSharedTaskCompletion(checkItemId: string, action: "A
         link: `/shared/${checkItem.note.shareId}`
       }
     })
+
+    // Email Notification to member
+    if (memberUser?.email) {
+      const ownerDisplayName = user.name || user.email || "Owner"
+      const appUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+      const html = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 20px; background: #ffffff; color: #111;">
+          <div style="border-bottom: 2px solid #ef4444; padding-bottom: 16px; margin-bottom: 24px;">
+            <h1 style="font-size: 20px; font-weight: 800; color: #111; margin: 0;">TaskOrbit</h1>
+            <p style="font-size: 13px; color: #dc2626; font-weight: 700; margin: 4px 0 0;">⚠️ Task Revision Requested</p>
+          </div>
+
+          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+            <p style="font-size: 14px; color: #991b1b; margin: 0 0 16px;">
+              Your completion of <strong>"${checkItem.taskText}"</strong> in <strong>"${checkItem.note.title}"</strong> was not approved by the owner <strong>(${ownerDisplayName})</strong>.
+            </p>
+            <p style="font-size: 13px; color: #7f1d1d; margin: 0;">
+              The task has been reset to unchecked. Please review and redo the work as requested.
+            </p>
+          </div>
+
+          <div style="text-align: center;">
+            <a href="${appUrl}/shared/${checkItem.note.shareId}" style="display: inline-block; background: #dc2626; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 14px;">
+              View Task List →
+            </a>
+          </div>
+        </div>
+      `
+
+      await sendTaskNotificationEmail({
+        to: memberUser.email,
+        subject: formatShortTaskSubject("Task Revision Requested ⚠️", checkItem.taskText, checkItem.note.title),
+        html
+      })
+    }
   }
 
   return { success: true }

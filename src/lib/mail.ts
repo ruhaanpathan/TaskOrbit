@@ -213,3 +213,68 @@ export async function sendFeedbackEmail({
 
   return { success: true }
 }
+
+export async function sendTaskNotificationEmail({
+  to,
+  subject,
+  html,
+}: {
+  to: string
+  subject: string
+  html: string
+}) {
+  const smtpUser = process.env.SMTP_USER
+  const smtpPass = process.env.SMTP_PASS
+  const resendApiKey = process.env.RESEND_API_KEY
+
+  if (!to) return { success: false, error: "No recipient email provided" }
+
+  // Priority 1: Gmail / SMTP
+  if (smtpUser && smtpPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: smtpUser.trim(),
+          pass: smtpPass.trim().replace(/\s+/g, ""),
+        },
+      })
+
+      await transporter.sendMail({
+        from: `TaskOrbit <${smtpUser.trim()}>`,
+        to: to.trim(),
+        subject,
+        html,
+      })
+
+      console.log(`✅ Task email delivered to ${to} via Gmail SMTP`)
+      return { success: true }
+    } catch (error: any) {
+      console.error("❌ Gmail SMTP Error:", error)
+    }
+  }
+
+  // Priority 2: Resend API
+  if (resendApiKey) {
+    try {
+      await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${resendApiKey.trim()}`,
+        },
+        body: JSON.stringify({
+          from: "TaskOrbit <onboarding@resend.dev>",
+          to: [to.trim()],
+          subject,
+          html,
+        }),
+      })
+      return { success: true }
+    } catch (error: any) {
+      console.error("❌ Resend Error:", error)
+    }
+  }
+
+  return { success: true }
+}
