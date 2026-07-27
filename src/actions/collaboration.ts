@@ -348,16 +348,60 @@ function formatShortTaskSubject(prefix: string, taskText: string, noteTitle?: st
 }
 
 // Owner Review & Approval Action for Shared Tasks
-export async function reviewSharedTaskCompletion(checkItemId: string, action: "APPROVE" | "REJECT") {
+export async function reviewSharedTaskCompletion(
+  checkItemId: string, 
+  action: "APPROVE" | "REJECT",
+  noteId?: string,
+  taskText?: string
+) {
   const user = await getRequireUser()
 
-  const checkItem = await db.taskCheckItem.findUnique({
+  let checkItem = await db.taskCheckItem.findUnique({
     where: { id: checkItemId },
     include: { note: true }
   })
 
-  if (!checkItem) return { error: "Task completion record not found" }
-  if (checkItem.note.userId !== user.id) return { error: "Only the owner can review completed tasks" }
+  // Fallback lookup by noteId + taskText if checkItemId wasn't found directly
+  if (!checkItem && noteId && taskText) {
+    const cleanText = taskText.trim()
+    checkItem = await db.taskCheckItem.findFirst({
+      where: { noteId, taskText: cleanText },
+      include: { note: true }
+    })
+  }
+
+  if (!checkItem) {
+    // If no TaskCheckItem row exists, but owner approves/rejects directly
+    if (noteId && taskText) {
+      const note = await db.note.findUnique({ where: { id: noteId } })
+      if (!note || note.userId !== user.id) return { error: "Only the owner can review tasks" }
+
+      const cleanText = taskText.trim()
+      if (action === "APPROVE" && note.content) {
+        const liRegex = /<li[^>]*>[\s\S]*?<\/li>/gi
+        let newContent = note.content
+        let liMatch
+        while ((liMatch = liRegex.exec(note.content)) !== null) {
+          const originalLi = liMatch[0]
+          if (originalLi.includes('data-type="taskItem"')) {
+            const rawText = originalLi.replace(/<[^>]*>/g, '').trim()
+            if (rawText === cleanText) {
+              const updatedLi = originalLi.replace('data-checked="false"', 'data-checked="true"')
+              newContent = newContent.replace(originalLi, updatedLi)
+              break
+            }
+          }
+        }
+        await db.note.update({ where: { id: note.id }, data: { content: newContent } })
+      }
+      return { success: true }
+    }
+    return { error: "Task completion record not found" }
+  }
+
+  if (checkItem.note.userId !== user.id) {
+    return { error: "Only the owner can review completed tasks" }
+  }
 
   const memberUser = await db.user.findUnique({
     where: { id: checkItem.completedByUserId },
@@ -367,7 +411,7 @@ export async function reviewSharedTaskCompletion(checkItemId: string, action: "A
   if (action === "APPROVE") {
     // 1. Update status to APPROVED
     await db.taskCheckItem.update({
-      where: { id: checkItemId },
+      where: { id: checkItem.id },
       data: { status: "APPROVED" }
     })
 
@@ -397,46 +441,54 @@ export async function reviewSharedTaskCompletion(checkItemId: string, action: "A
     }
 
     // 3. In-app Notification for member
-    await db.notification.create({
-      data: {
-        userId: checkItem.completedByUserId,
-        type: "TASK_APPROVED",
-        title: "Task Approved!",
-        message: `Your completion of "${checkItem.taskText}" in "${checkItem.note.title}" was approved by the owner.`,
-        link: `/shared/${checkItem.note.shareId}`
-      }
-    })
+    try {
+      await db.notification.create({
+        data: {
+          userId: checkItem.completedByUserId,
+          type: "TASK_APPROVED",
+          title: "Task Approved!",
+          message: `Your completion of "${checkItem.taskText}" in "${checkItem.note.title}" was approved by the owner.`,
+          link: `/shared/${checkItem.note.shareId}`
+        }
+      })
+    } catch (e) {
+      console.error("Failed to create in-app notification:", e)
+    }
 
-    // 4. Email Notification to member
+    // 4. Email Notification to member (non-blocking)
     if (memberUser?.email) {
-      const ownerDisplayName = user.name || user.email || "Owner"
-      const html = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 20px; background: #ffffff; color: #111;">
-          <div style="border-bottom: 2px solid #22c55e; padding-bottom: 16px; margin-bottom: 24px;">
-            <h1 style="font-size: 20px; font-weight: 800; color: #111; margin: 0;">TaskOrbit</h1>
-            <p style="font-size: 13px; color: #16a34a; font-weight: 700; margin: 4px 0 0;">🎉 Task Completion Approved!</p>
-          </div>
+      try {
+        const ownerDisplayName = user.name || user.email || "Owner"
+        const html = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 20px; background: #ffffff; color: #111;">
+            <div style="border-bottom: 2px solid #22c55e; padding-bottom: 16px; margin-bottom: 24px;">
+              <h1 style="font-size: 20px; font-weight: 800; color: #111; margin: 0;">TaskOrbit</h1>
+              <p style="font-size: 13px; color: #16a34a; font-weight: 700; margin: 4px 0 0;">🎉 Task Completion Approved!</p>
+            </div>
 
-          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-            <p style="font-size: 14px; color: #166534; margin: 0 0 16px;">
-              Great job! Your completion of <strong>"${checkItem.taskText}"</strong> in <strong>"${checkItem.note.title}"</strong> was accepted and approved by the owner <strong>(${ownerDisplayName})</strong>.
-            </p>
-            <div style="background: #ffffff; border: 1px solid #86efac; color: #15803d; padding: 14px 18px; border-radius: 8px; font-weight: 700; font-size: 15px;">
-              ✓ Approved & Completed
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+              <p style="font-size: 14px; color: #166534; margin: 0 0 16px;">
+                Great job! Your completion of <strong>"${checkItem.taskText}"</strong> in <strong>"${checkItem.note.title}"</strong> was accepted and approved by the owner <strong>(${ownerDisplayName})</strong>.
+              </p>
+              <div style="background: #ffffff; border: 1px solid #86efac; color: #15803d; padding: 14px 18px; border-radius: 8px; font-weight: 700; font-size: 15px;">
+                ✓ Approved & Completed
+              </div>
             </div>
           </div>
-        </div>
-      `
+        `
 
-      await sendTaskNotificationEmail({
-        to: memberUser.email,
-        subject: formatShortTaskSubject("Task Approved! 🎉", checkItem.taskText, checkItem.note.title),
-        html
-      })
+        await sendTaskNotificationEmail({
+          to: memberUser.email,
+          subject: formatShortTaskSubject("Task Approved! 🎉", checkItem.taskText, checkItem.note.title),
+          html
+        })
+      } catch (e) {
+        console.error("Failed to send approval email:", e)
+      }
     }
   } else {
     // REJECT: Delete completion record and uncheck task in note HTML so it resets completely
-    await db.taskCheckItem.delete({ where: { id: checkItemId } })
+    await db.taskCheckItem.delete({ where: { id: checkItem.id } })
 
     if (checkItem.note.content) {
       const liRegex = /<li[^>]*>[\s\S]*?<\/li>/gi
@@ -462,49 +514,57 @@ export async function reviewSharedTaskCompletion(checkItemId: string, action: "A
     }
 
     // In-app Notification for member
-    await db.notification.create({
-      data: {
-        userId: checkItem.completedByUserId,
-        type: "TASK_REJECTED",
-        title: "Task Revision Requested",
-        message: `Your completion of "${checkItem.taskText}" in "${checkItem.note.title}" was not approved by the owner. Please review and redo.`,
-        link: `/shared/${checkItem.note.shareId}`
-      }
-    })
-
-    // Email Notification to member
-    if (memberUser?.email) {
-      const ownerDisplayName = user.name || user.email || "Owner"
-      const appUrl = getAppBaseUrl()
-      const html = `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 20px; background: #ffffff; color: #111;">
-          <div style="border-bottom: 2px solid #ef4444; padding-bottom: 16px; margin-bottom: 24px;">
-            <h1 style="font-size: 20px; font-weight: 800; color: #111; margin: 0;">TaskOrbit</h1>
-            <p style="font-size: 13px; color: #dc2626; font-weight: 700; margin: 4px 0 0;">⚠️ Task Revision Requested</p>
-          </div>
-
-          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-            <p style="font-size: 14px; color: #991b1b; margin: 0 0 16px;">
-              Your completion of <strong>"${checkItem.taskText}"</strong> in <strong>"${checkItem.note.title}"</strong> was not approved by the owner <strong>(${ownerDisplayName})</strong>.
-            </p>
-            <p style="font-size: 13px; color: #7f1d1d; margin: 0;">
-              The task has been reset to unchecked. Please review and redo the work as requested.
-            </p>
-          </div>
-
-          <div style="text-align: center;">
-            <a href="${appUrl}/shared/${checkItem.note.shareId}" style="display: inline-block; background: #dc2626; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 14px;">
-              View Task List →
-            </a>
-          </div>
-        </div>
-      `
-
-      await sendTaskNotificationEmail({
-        to: memberUser.email,
-        subject: formatShortTaskSubject("Task Revision Requested ⚠️", checkItem.taskText, checkItem.note.title),
-        html
+    try {
+      await db.notification.create({
+        data: {
+          userId: checkItem.completedByUserId,
+          type: "TASK_REJECTED",
+          title: "Task Revision Requested",
+          message: `Your completion of "${checkItem.taskText}" in "${checkItem.note.title}" was not approved by the owner. Please review and redo.`,
+          link: `/shared/${checkItem.note.shareId}`
+        }
       })
+    } catch (e) {
+      console.error("Failed to create in-app notification:", e)
+    }
+
+    // Email Notification to member (non-blocking)
+    if (memberUser?.email) {
+      try {
+        const ownerDisplayName = user.name || user.email || "Owner"
+        const appUrl = getAppBaseUrl()
+        const html = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 20px; background: #ffffff; color: #111;">
+            <div style="border-bottom: 2px solid #ef4444; padding-bottom: 16px; margin-bottom: 24px;">
+              <h1 style="font-size: 20px; font-weight: 800; color: #111; margin: 0;">TaskOrbit</h1>
+              <p style="font-size: 13px; color: #dc2626; font-weight: 700; margin: 4px 0 0;">⚠️ Task Revision Requested</p>
+            </div>
+
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+              <p style="font-size: 14px; color: #991b1b; margin: 0 0 16px;">
+                Your completion of <strong>"${checkItem.taskText}"</strong> in <strong>"${checkItem.note.title}"</strong> was not approved by the owner <strong>(${ownerDisplayName})</strong>.
+              </p>
+              <p style="font-size: 13px; color: #7f1d1d; margin: 0;">
+                The task has been reset to unchecked. Please review and redo the work as requested.
+              </p>
+            </div>
+
+            <div style="text-align: center;">
+              <a href="${appUrl}/shared/${checkItem.note.shareId}" style="display: inline-block; background: #dc2626; color: #ffffff; padding: 12px 24px; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 14px;">
+                View Task List →
+              </a>
+            </div>
+          </div>
+        `
+
+        await sendTaskNotificationEmail({
+          to: memberUser.email,
+          subject: formatShortTaskSubject("Task Revision Requested ⚠️", checkItem.taskText, checkItem.note.title),
+          html
+        })
+      } catch (e) {
+        console.error("Failed to send rejection email:", e)
+      }
     }
   }
 

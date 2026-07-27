@@ -66,16 +66,17 @@ export function SharedTeamTasksDashboardList({ initialTasks }: { initialTasks: S
   }
 
   // Handle Owner Approving or Rejecting task completion
-  const handleReview = async (checkItemId: string, action: "APPROVE" | "REJECT") => {
-    setProcessingId(checkItemId)
+  const handleReview = async (task: SharedDashboardTask, action: "APPROVE" | "REJECT") => {
+    const targetId = task.checkItemId || task.noteId
+    setProcessingId(targetId)
     try {
-      const res = await reviewSharedTaskCompletion(checkItemId, action)
+      const res = await reviewSharedTaskCompletion(task.checkItemId || "", action, task.noteId, task.text)
       if (res.error) {
         toast.error(res.error)
       } else {
         toast.success(action === "APPROVE" ? "Task approved!" : "Task completion rejected")
         // Remove reviewed item from dashboard list
-        setTasks((prev) => prev.filter((t) => t.checkItemId !== checkItemId))
+        setTasks((prev) => prev.filter((t) => t.text !== task.text || t.noteId !== task.noteId))
       }
     } catch (e) {
       toast.error("Failed to review task")
@@ -96,6 +97,7 @@ export function SharedTeamTasksDashboardList({ initialTasks }: { initialTasks: S
     <div className="divide-y divide-border">
       {tasks.map((task, i) => {
         const isChecked = !!task.isCompletedByMember
+        const targetId = task.checkItemId || task.noteId
 
         return (
           <div 
@@ -104,49 +106,41 @@ export function SharedTeamTasksDashboardList({ initialTasks }: { initialTasks: S
           >
             <div className="flex items-start justify-between gap-4">
               
-              {/* Checkbox & Task Text */}
+              {/* Task Checkbox & Title */}
               <div className="flex items-start gap-3 flex-1 min-w-0">
                 <button
                   type="button"
-                  onClick={() => handleToggleTaskFromDashboard(task, i)}
                   disabled={togglingTaskText === task.text}
-                  className={`mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center transition-all shrink-0 cursor-pointer ${
+                  onClick={() => handleToggleTaskFromDashboard(task, i)}
+                  className={`mt-0.5 w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
                     isChecked
                       ? "bg-primary border-primary text-primary-foreground"
-                      : "border-border/80 hover:border-primary"
+                      : "border-border hover:border-primary"
                   }`}
-                  title={isChecked ? "Uncheck task" : "Check off task"}
                 >
-                  {togglingTaskText === task.text ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : isChecked ? (
-                    <Check className="w-3.5 h-3.5 stroke-[3]" />
-                  ) : null}
+                  {isChecked && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                 </button>
 
-                <div className="space-y-1 flex-1 min-w-0">
-                  <p className={`text-sm font-medium leading-snug ${isChecked ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-semibold leading-snug ${isChecked ? "line-through text-muted-foreground" : "text-foreground"}`}>
                     {task.text}
                   </p>
 
-                  {/* Completion Attribution Badge */}
-                  {isChecked && (
-                    <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                      <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 font-bold bg-green-500/10 px-2 py-0.5 rounded-md">
-                        <UserCheck className="w-3 h-3" /> Done by {task.completedByName || "Team Member"}
+                  {/* Completion attribution */}
+                  {task.completedByName && (
+                    <div className="flex items-center gap-1.5 text-[11px] text-green-600 dark:text-green-400 font-medium mt-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>
+                        Done by <strong className="font-bold">{task.completedByName}</strong>
+                        {task.completedAt && ` • ${formatDistanceToNow(new Date(task.completedAt))} ago`}
                       </span>
-                      {task.completedAt && (
-                        <span className="text-muted-foreground font-medium">
-                          • {formatDistanceToNow(new Date(task.completedAt))} ago
-                        </span>
-                      )}
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Note Title & Owner / Folder Info Link */}
-              <div className="flex flex-col items-end gap-1 shrink-0">
+              {/* Note / Task Link & Owner Metadata */}
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
                 <Link 
                   href={`/shared/${task.shareId}`} 
                   target="_blank"
@@ -176,7 +170,7 @@ export function SharedTeamTasksDashboardList({ initialTasks }: { initialTasks: S
             </div>
 
             {/* Owner Review Controls (Accept / Reject) */}
-            {isChecked && task.checkItemId && task.isOwner && (
+            {isChecked && task.isOwner && (
               <div className="flex items-center justify-between bg-card p-2.5 rounded-xl border border-border/80 text-xs mt-1">
                 <span className="text-muted-foreground font-medium flex items-center gap-1">
                   <Clock className="w-3.5 h-3.5 text-amber-500" /> Owner Review Required:
@@ -187,8 +181,8 @@ export function SharedTeamTasksDashboardList({ initialTasks }: { initialTasks: S
                     size="sm"
                     variant="outline"
                     className="h-7 text-xs gap-1 text-destructive hover:bg-destructive/10 border-destructive/30"
-                    disabled={processingId === task.checkItemId}
-                    onClick={() => handleReview(task.checkItemId!, "REJECT")}
+                    disabled={processingId === targetId}
+                    onClick={() => handleReview(task, "REJECT")}
                   >
                     <X className="w-3.5 h-3.5" /> Reject
                   </Button>
@@ -196,10 +190,10 @@ export function SharedTeamTasksDashboardList({ initialTasks }: { initialTasks: S
                   <Button
                     size="sm"
                     className="h-7 text-xs gap-1 font-bold bg-green-600 hover:bg-green-700 text-white"
-                    disabled={processingId === task.checkItemId}
-                    onClick={() => handleReview(task.checkItemId!, "APPROVE")}
+                    disabled={processingId === targetId}
+                    onClick={() => handleReview(task, "APPROVE")}
                   >
-                    {processingId === task.checkItemId ? (
+                    {processingId === targetId ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
                       <Check className="w-3.5 h-3.5 stroke-[3]" />
