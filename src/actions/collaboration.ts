@@ -13,6 +13,17 @@ async function getRequireUser() {
   return session.user
 }
 
+// Helper to resolve canonical application URL for emails
+function getAppBaseUrl() {
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")
+  }
+  if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes("localhost")) {
+    return process.env.NEXTAUTH_URL.replace(/\/$/, "")
+  }
+  return "https://task-orbit-delta.vercel.app"
+}
+
 // 1. Get full details of a shared task list for rendering
 export async function getSharedTaskDetails(shareId: string) {
   const session = await auth()
@@ -244,17 +255,6 @@ export async function toggleCollaborativeTask(shareId: string, taskText: string,
         where: { id: note.userId },
         select: { email: true, name: true }
       })
-
-function getAppBaseUrl() {
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")
-  }
-  if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes("localhost")) {
-    return process.env.NEXTAUTH_URL.replace(/\/$/, "")
-  }
-  // Use primary canonical production domain so emails keep users logged in
-  return "https://task-orbit-delta.vercel.app"
-}
 
       if (ownerUser?.email) {
         const memberDisplayName = user.name || user.email || "Team Member"
