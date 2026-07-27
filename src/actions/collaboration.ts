@@ -349,39 +349,42 @@ function formatShortTaskSubject(prefix: string, taskText: string, noteTitle?: st
 
 // Owner Review & Approval Action for Shared Tasks
 export async function reviewSharedTaskCompletion(
-  checkItemId: string, 
+  checkItemId?: string, 
   action: "APPROVE" | "REJECT",
   noteId?: string,
   taskText?: string
 ) {
-  const user = await getRequireUser()
+  try {
+    const user = await getRequireUser()
 
-  let checkItem = checkItemId
-    ? await db.taskCheckItem.findUnique({
-        where: { id: checkItemId },
-        include: { note: { include: { collaborators: { include: { user: { select: { email: true, name: true } } } } } } }
+    let checkItem = (checkItemId && checkItemId.trim().length > 0)
+      ? await db.taskCheckItem.findUnique({
+          where: { id: checkItemId },
+          include: { note: { include: { user: { select: { id: true, email: true } }, collaborators: { include: { user: { select: { email: true, name: true } } } } } } }
+        })
+      : null
+
+    if (!checkItem && noteId && taskText) {
+      const cleanText = taskText.trim()
+      checkItem = await db.taskCheckItem.findFirst({
+        where: { noteId, taskText: cleanText },
+        include: { note: { include: { user: { select: { id: true, email: true } }, collaborators: { include: { user: { select: { email: true, name: true } } } } } } }
       })
-    : null
+    }
 
-  if (!checkItem && noteId && taskText) {
-    const cleanText = taskText.trim()
-    checkItem = await db.taskCheckItem.findFirst({
-      where: { noteId, taskText: cleanText },
-      include: { note: { include: { collaborators: { include: { user: { select: { email: true, name: true } } } } } } }
-    })
-  }
+    // Get note object
+    let note = checkItem?.note || null
+    if (!note && noteId) {
+      note = await db.note.findUnique({
+        where: { id: noteId },
+        include: { user: { select: { id: true, email: true } }, collaborators: { include: { user: { select: { email: true, name: true } } } } }
+      })
+    }
 
-  // Get note object
-  let note = checkItem?.note || null
-  if (!note && noteId) {
-    note = await db.note.findUnique({
-      where: { id: noteId },
-      include: { collaborators: { include: { user: { select: { email: true, name: true } } } } }
-    })
-  }
+    if (!note) return { error: "Task list not found" }
 
-  if (!note) return { error: "Task list not found" }
-  if (note.userId !== user.id) return { error: "Only the owner can review completed tasks" }
+    const isOwner = note.userId === user.id || (user.email && note.user?.email === user.email)
+    if (!isOwner) return { error: "Only the owner can review completed tasks" }
 
   const cleanText = (taskText || checkItem?.taskText || "").trim()
 
@@ -583,7 +586,11 @@ export async function reviewSharedTaskCompletion(
     }
   }
 
-  return { success: true }
+    return { success: true }
+  } catch (error: any) {
+    console.error("Error in reviewSharedTaskCompletion:", error)
+    return { error: error?.message || "Failed to process task review" }
+  }
 }
 
 // 5. Add Inline Comment to Task
