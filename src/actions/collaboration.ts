@@ -246,19 +246,14 @@ export async function toggleCollaborativeTask(shareId: string, taskText: string,
       })
 
 function getAppBaseUrl() {
-  if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes("localhost")) {
-    return process.env.NEXTAUTH_URL.replace(/\/$/, "")
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL.replace(/\/$/, "")}`
-  }
   if (process.env.NEXT_PUBLIC_APP_URL) {
     return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")
   }
-  if (process.env.NODE_ENV === "production") {
-    return "https://task-orbit-delta.vercel.app"
+  if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes("localhost")) {
+    return process.env.NEXTAUTH_URL.replace(/\/$/, "")
   }
-  return "http://localhost:3000"
+  // Use primary canonical production domain so emails keep users logged in
+  return "https://task-orbit-delta.vercel.app"
 }
 
       if (ownerUser?.email) {
