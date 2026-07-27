@@ -245,9 +245,25 @@ export async function toggleCollaborativeTask(shareId: string, taskText: string,
         select: { email: true, name: true }
       })
 
+function getAppBaseUrl() {
+  if (process.env.NEXTAUTH_URL && !process.env.NEXTAUTH_URL.includes("localhost")) {
+    return process.env.NEXTAUTH_URL.replace(/\/$/, "")
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL.replace(/\/$/, "")}`
+  }
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "")
+  }
+  if (process.env.NODE_ENV === "production") {
+    return "https://task-orbit-delta.vercel.app"
+  }
+  return "http://localhost:3000"
+}
+
       if (ownerUser?.email) {
         const memberDisplayName = user.name || user.email || "Team Member"
-        const appUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+        const appUrl = getAppBaseUrl()
         const html = `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 20px; background: #ffffff; color: #111;">
             <div style="border-bottom: 2px solid #6366f1; padding-bottom: 16px; margin-bottom: 24px;">
@@ -464,7 +480,7 @@ export async function reviewSharedTaskCompletion(checkItemId: string, action: "A
     // Email Notification to member
     if (memberUser?.email) {
       const ownerDisplayName = user.name || user.email || "Owner"
-      const appUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+      const appUrl = getAppBaseUrl()
       const html = `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 32px 20px; background: #ffffff; color: #111;">
           <div style="border-bottom: 2px solid #ef4444; padding-bottom: 16px; margin-bottom: 24px;">
