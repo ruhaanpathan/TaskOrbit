@@ -403,10 +403,30 @@ export async function reviewSharedTaskCompletion(
     return { error: "Only the owner can review completed tasks" }
   }
 
-  const memberUser = await db.user.findUnique({
-    where: { id: checkItem.completedByUserId },
-    select: { email: true, name: true }
-  })
+  // Safely resolve member email to prevent Prisma null query errors
+  let memberEmail: string | null = null
+
+  if (checkItem.completedByUserId) {
+    const memberUser = await db.user.findUnique({
+      where: { id: checkItem.completedByUserId },
+      select: { email: true, name: true }
+    })
+    memberEmail = memberUser?.email || null
+  }
+
+  if (!memberEmail && checkItem.completedByName?.includes("@")) {
+    memberEmail = checkItem.completedByName.trim()
+  }
+
+  if (!memberEmail) {
+    const noteWithCollaborators = await db.note.findUnique({
+      where: { id: checkItem.noteId },
+      include: { collaborators: { include: { user: { select: { email: true } } } } }
+    })
+    if (noteWithCollaborators?.collaborators?.length === 1) {
+      memberEmail = noteWithCollaborators.collaborators[0].user?.email || null
+    }
+  }
 
   if (action === "APPROVE") {
     // 1. Update status to APPROVED
@@ -441,22 +461,24 @@ export async function reviewSharedTaskCompletion(
     }
 
     // 3. In-app Notification for member
-    try {
-      await db.notification.create({
-        data: {
-          userId: checkItem.completedByUserId,
-          type: "TASK_APPROVED",
-          title: "Task Approved!",
-          message: `Your completion of "${checkItem.taskText}" in "${checkItem.note.title}" was approved by the owner.`,
-          link: `/shared/${checkItem.note.shareId}`
-        }
-      })
-    } catch (e) {
-      console.error("Failed to create in-app notification:", e)
+    if (checkItem.completedByUserId) {
+      try {
+        await db.notification.create({
+          data: {
+            userId: checkItem.completedByUserId,
+            type: "TASK_APPROVED",
+            title: "Task Approved!",
+            message: `Your completion of "${checkItem.taskText}" in "${checkItem.note.title}" was approved by the owner.`,
+            link: `/shared/${checkItem.note.shareId}`
+          }
+        })
+      } catch (e) {
+        console.error("Failed to create in-app notification:", e)
+      }
     }
 
     // 4. Email Notification to member (non-blocking)
-    if (memberUser?.email) {
+    if (memberEmail) {
       try {
         const ownerDisplayName = user.name || user.email || "Owner"
         const html = `
@@ -478,7 +500,7 @@ export async function reviewSharedTaskCompletion(
         `
 
         await sendTaskNotificationEmail({
-          to: memberUser.email,
+          to: memberEmail,
           subject: formatShortTaskSubject("Task Approved! 🎉", checkItem.taskText, checkItem.note.title),
           html
         })
@@ -514,22 +536,24 @@ export async function reviewSharedTaskCompletion(
     }
 
     // In-app Notification for member
-    try {
-      await db.notification.create({
-        data: {
-          userId: checkItem.completedByUserId,
-          type: "TASK_REJECTED",
-          title: "Task Revision Requested",
-          message: `Your completion of "${checkItem.taskText}" in "${checkItem.note.title}" was not approved by the owner. Please review and redo.`,
-          link: `/shared/${checkItem.note.shareId}`
-        }
-      })
-    } catch (e) {
-      console.error("Failed to create in-app notification:", e)
+    if (checkItem.completedByUserId) {
+      try {
+        await db.notification.create({
+          data: {
+            userId: checkItem.completedByUserId,
+            type: "TASK_REJECTED",
+            title: "Task Revision Requested",
+            message: `Your completion of "${checkItem.taskText}" in "${checkItem.note.title}" was not approved by the owner. Please review and redo.`,
+            link: `/shared/${checkItem.note.shareId}`
+          }
+        })
+      } catch (e) {
+        console.error("Failed to create in-app notification:", e)
+      }
     }
 
     // Email Notification to member (non-blocking)
-    if (memberUser?.email) {
+    if (memberEmail) {
       try {
         const ownerDisplayName = user.name || user.email || "Owner"
         const appUrl = getAppBaseUrl()
@@ -558,7 +582,7 @@ export async function reviewSharedTaskCompletion(
         `
 
         await sendTaskNotificationEmail({
-          to: memberUser.email,
+          to: memberEmail,
           subject: formatShortTaskSubject("Task Revision Requested ⚠️", checkItem.taskText, checkItem.note.title),
           html
         })
