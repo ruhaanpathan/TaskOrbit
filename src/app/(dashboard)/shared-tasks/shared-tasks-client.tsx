@@ -353,7 +353,10 @@ export function SharedTasksDashboardClient({ initialData }: { initialData: any }
             const collaboratorsCount = collaboratorsList.length + 1
             const pendingReqsCount = note.joinRequests?.length || 0
             const completedTaskTexts = new Set<string>()
+            const allTaskTexts = new Set<string>()
+
             note.checkItems?.forEach((item: any) => {
+              allTaskTexts.add(item.taskText.trim())
               if (item.status !== "REJECTED") {
                 completedTaskTexts.add(item.taskText.trim())
               }
@@ -363,13 +366,17 @@ export function SharedTasksDashboardClient({ initialData }: { initialData: any }
               let match
               while ((match = regex.exec(note.content)) !== null) {
                 const attributes = match[1]
-                if (attributes.includes('data-checked="true"')) {
-                  let rawText = match[2].replace(/<[^>]*>/g, '').trim()
-                  if (rawText) completedTaskTexts.add(rawText)
+                let rawText = match[2].replace(/<[^>]*>/g, '').trim()
+                if (rawText) {
+                  allTaskTexts.add(rawText)
+                  if (attributes.includes('data-checked="true"')) {
+                    completedTaskTexts.add(rawText)
+                  }
                 }
               }
             }
             const completedTasksCount = completedTaskTexts.size
+            const totalTasksCount = allTaskTexts.size
             const commentsCount = note.comments?.length || 0
 
             return (
@@ -420,7 +427,9 @@ export function SharedTasksDashboardClient({ initialData }: { initialData: any }
                     <div className="bg-muted/30 p-2.5 rounded-xl border border-border/40 flex items-center gap-2">
                       <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
                       <div>
-                        <p className="font-bold text-foreground">{completedTasksCount}</p>
+                        <p className="font-bold text-foreground">
+                          {completedTasksCount} / {totalTasksCount}
+                        </p>
                         <p className="text-[10px] text-muted-foreground">Completed Tasks</p>
                       </div>
                     </div>
