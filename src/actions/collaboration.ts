@@ -386,29 +386,34 @@ export async function reviewSharedTaskCompletion(
   const cleanText = (taskText || checkItem?.taskText || "").trim()
 
   // 1. Resolve recipient emails (collaborators on this note)
-  const recipientEmails: string[] = []
+  const rawEmails: string[] = []
 
   if (checkItem?.completedByUserId) {
     const memberUser = await db.user.findUnique({
       where: { id: checkItem.completedByUserId },
       select: { email: true }
     })
-    if (memberUser?.email && memberUser.email !== user.email) {
-      recipientEmails.push(memberUser.email)
+    if (memberUser?.email) {
+      rawEmails.push(memberUser.email)
     }
   }
 
-  if (recipientEmails.length === 0 && checkItem?.completedByName?.includes("@")) {
-    const email = checkItem.completedByName.trim()
-    if (email !== user.email) recipientEmails.push(email)
+  if (checkItem?.completedByName?.includes("@")) {
+    rawEmails.push(checkItem.completedByName.trim())
   }
 
-  if (recipientEmails.length === 0 && note.collaborators?.length > 0) {
+  if (note.collaborators?.length > 0) {
     note.collaborators.forEach((col: any) => {
-      if (col.user?.email && col.user.email !== user.email && !recipientEmails.includes(col.user.email)) {
-        recipientEmails.push(col.user.email)
+      if (col.user?.email) {
+        rawEmails.push(col.user.email)
       }
     })
+  }
+
+  // Deduplicate emails and fallback to current user's email if testing
+  let recipientEmails = Array.from(new Set(rawEmails.filter(Boolean)))
+  if (recipientEmails.length === 0 && user.email) {
+    recipientEmails = [user.email]
   }
 
   const ownerDisplayName = user.name || user.email || "Owner"
